@@ -32,6 +32,11 @@ self.addEventListener('activate', (event) => {
 
 // Fetch — network first, fall back to cache
 self.addEventListener('fetch', (event) => {
+  // Skip caching for non-GET requests and external API calls (e.g., Firebase)
+  if (event.request.method !== 'GET' || event.request.url.includes('googleapis.com') || event.request.url.includes('firebaseio.com')) {
+    return; // Bypass service worker completely
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {

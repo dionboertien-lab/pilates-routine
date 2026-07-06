@@ -29,8 +29,8 @@ export function renderHome() {
         <div class="home__top-bar">
           <div class="home__leaf">🌿</div>
           <div class="home__actions">
-            <button class="home__action-btn" id="community-btn" title="Community">🏆</button>
-            <button class="home__action-btn" id="settings-btn" title="${t('set.title')}">⚙️</button>
+            <button class="home__action-btn" id="community-btn" title="Community" aria-label="Community">🏆</button>
+            <button class="home__action-btn" id="settings-btn" title="${t('set.title')}" aria-label="${t('set.title')}">⚙️</button>
           </div>
         </div>
         <h1 class="home__title">${t('home.greeting')}${name ? ` ${escapeHTML(name)}` : ''}!</h1>

@@ -162,8 +162,11 @@ function renderCircleInteraction(mode) {
             <span class="interaction__unit">${t('wk.seconds')}</span>
           </div>
         </div>
-        <button class="interaction__timer-btn ${state.timerRunning ? 'interaction__timer-btn--pause' : 'interaction__timer-btn--start'}" id="timer-btn">
-          ${state.timerRunning ? t('btn.pause') : t('btn.start')}
+        <button 
+          class="interaction__timer-btn ${state.timerRunning ? 'interaction__timer-btn--pause' : 'interaction__timer-btn--start'}" 
+          id="timer-btn"
+          aria-label="${state.timerRunning ? 'Pauzeer timer' : 'Start timer'}">
+          ${state.timerRunning ? '⏸' : '▶'}
         </button>
       </div>
     `;
