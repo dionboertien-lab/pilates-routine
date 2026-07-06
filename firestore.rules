@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      // Anyone logged in can read (needed for leaderboard and group logic).
+      allow read: if request.auth != null;
+      // Users can only update their own documents.
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /communities/{communityId} {
+      // Anyone logged in can read or join/create communities.
+      allow read, write: if request.auth != null;
+    }
+  }
+}
