@@ -76,3 +76,21 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+import { App as CapacitorApp } from '@capacitor/app';
+
+CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+  if (state.screen === 'home') {
+    CapacitorApp.exitApp();
+  } else if (state.screen === 'onboarding') {
+    if (state.onboardingStep > 0) {
+      state.onboardingStep--;
+      render();
+    } else {
+      CapacitorApp.exitApp();
+    }
+  } else {
+    state.screen = 'home';
+    render();
+  }
+});
