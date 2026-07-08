@@ -4,4 +4,5 @@
     <string name="title_activity_main">Pilates Routine</string>
     <string name="package_name">com.pilatestrainer.app</string>
     <string name="custom_url_scheme">com.pilatestrainer.app</string>
+    <string name="server_client_id">443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com</string>
 </resources>

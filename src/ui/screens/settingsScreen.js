@@ -61,42 +61,42 @@ export function renderSettings() {
       <div class="settings__group">
         <label class="settings__label">${t('set.lvl.core')}</label>
         <select class="settings__input" id="set-level-core">
-          <option value="1" ${profile.baseLevels?.core === 1 ? 'selected' : ''}>${t('ob.level.beg.title')}</option>
-          <option value="2" ${profile.baseLevels?.core === 2 ? 'selected' : ''}>Beginner+</option>
-          <option value="3" ${profile.baseLevels?.core === 3 ? 'selected' : ''}>Licht Gemiddeld</option>
-          <option value="4" ${profile.baseLevels?.core === 4 ? 'selected' : ''}>${t('ob.level.int.title')}</option>
-          <option value="5" ${profile.baseLevels?.core === 5 ? 'selected' : ''}>Gemiddeld+</option>
-          <option value="6" ${profile.baseLevels?.core === 6 ? 'selected' : ''}>${t('ob.level.adv.title')}</option>
-          <option value="7" ${profile.baseLevels?.core === 7 ? 'selected' : ''}>Gevorderd+</option>
-          <option value="8" ${profile.baseLevels?.core === 8 ? 'selected' : ''}>Expert</option>
+          <option value="1" ${profile.baseLevels?.core === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
+          <option value="2" ${profile.baseLevels?.core === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
+          <option value="3" ${profile.baseLevels?.core === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
+          <option value="4" ${profile.baseLevels?.core === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
+          <option value="5" ${profile.baseLevels?.core === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
+          <option value="6" ${profile.baseLevels?.core === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
+          <option value="7" ${profile.baseLevels?.core === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
+          <option value="8" ${profile.baseLevels?.core === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
         </select>
       </div>
 
       <div class="settings__group">
         <label class="settings__label">${t('set.lvl.legs')}</label>
         <select class="settings__input" id="set-level-benen">
-          <option value="1" ${profile.baseLevels?.['benen-billen'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')}</option>
-          <option value="2" ${profile.baseLevels?.['benen-billen'] === 2 ? 'selected' : ''}>Beginner+</option>
-          <option value="3" ${profile.baseLevels?.['benen-billen'] === 3 ? 'selected' : ''}>Licht Gemiddeld</option>
-          <option value="4" ${profile.baseLevels?.['benen-billen'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')}</option>
-          <option value="5" ${profile.baseLevels?.['benen-billen'] === 5 ? 'selected' : ''}>Gemiddeld+</option>
-          <option value="6" ${profile.baseLevels?.['benen-billen'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')}</option>
-          <option value="7" ${profile.baseLevels?.['benen-billen'] === 7 ? 'selected' : ''}>Gevorderd+</option>
-          <option value="8" ${profile.baseLevels?.['benen-billen'] === 8 ? 'selected' : ''}>Expert</option>
+          <option value="1" ${profile.baseLevels?.['benen-billen'] === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
+          <option value="2" ${profile.baseLevels?.['benen-billen'] === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
+          <option value="3" ${profile.baseLevels?.['benen-billen'] === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
+          <option value="4" ${profile.baseLevels?.['benen-billen'] === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
+          <option value="5" ${profile.baseLevels?.['benen-billen'] === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
+          <option value="6" ${profile.baseLevels?.['benen-billen'] === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
+          <option value="7" ${profile.baseLevels?.['benen-billen'] === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
+          <option value="8" ${profile.baseLevels?.['benen-billen'] === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
         </select>
       </div>
 
       <div class="settings__group">
         <label class="settings__label">${t('set.lvl.back')}</label>
         <select class="settings__input" id="set-level-rug">
-          <option value="1" ${profile.baseLevels?.['rug-houding'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')}</option>
-          <option value="2" ${profile.baseLevels?.['rug-houding'] === 2 ? 'selected' : ''}>Beginner+</option>
-          <option value="3" ${profile.baseLevels?.['rug-houding'] === 3 ? 'selected' : ''}>Licht Gemiddeld</option>
-          <option value="4" ${profile.baseLevels?.['rug-houding'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')}</option>
-          <option value="5" ${profile.baseLevels?.['rug-houding'] === 5 ? 'selected' : ''}>Gemiddeld+</option>
-          <option value="6" ${profile.baseLevels?.['rug-houding'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')}</option>
-          <option value="7" ${profile.baseLevels?.['rug-houding'] === 7 ? 'selected' : ''}>Gevorderd+</option>
-          <option value="8" ${profile.baseLevels?.['rug-houding'] === 8 ? 'selected' : ''}>Expert</option>
+          <option value="1" ${profile.baseLevels?.['rug-houding'] === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
+          <option value="2" ${profile.baseLevels?.['rug-houding'] === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
+          <option value="3" ${profile.baseLevels?.['rug-houding'] === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
+          <option value="4" ${profile.baseLevels?.['rug-houding'] === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
+          <option value="5" ${profile.baseLevels?.['rug-houding'] === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
+          <option value="6" ${profile.baseLevels?.['rug-houding'] === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
+          <option value="7" ${profile.baseLevels?.['rug-houding'] === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
+          <option value="8" ${profile.baseLevels?.['rug-houding'] === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
         </select>
       </div>
 

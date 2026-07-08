@@ -1,5 +1,5 @@
 import { state } from '../../state.js';
-import { app, render, showDialog, playBeep } from '../core.js';
+import { app, render, showDialog, showToast, playBeep } from '../core.js';
 import { getUserName, getProfile, markTodayComplete } from '../../utils/storage.js';
 import { getSection, getWeekProgression, buildWorkoutSteps } from '../../data/exercises.js';
 import { getCurrentWeek } from '../../utils/storage.js';
@@ -380,7 +380,7 @@ function handleSkip() {
   
   const steps = state.workoutSteps;
   if (state.skippedCount === Math.floor(steps.length / 2)) {
-    alert("Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.");
+    showToast(t('wk.skipWarning'), 'error');
   }
   
   nextStep();
@@ -396,8 +396,8 @@ function nextStep() {
   if (nextIndex >= steps.length) {
     if (state.skippedCount > steps.length / 2) {
       showDialog(
-        'Niet voltooid',
-        'Je hebt meer dan de helft van de oefeningen overgeslagen. Deze workout telt helaas niet mee voor je voortgang.',
+        t('wk.notCompleted.title'),
+        t('wk.notCompleted.msg'),
         t('btn.confirm'),
         null,
         () => { state.screen = 'home'; render(); }

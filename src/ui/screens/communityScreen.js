@@ -1,5 +1,5 @@
 import { state } from '../../state.js';
-import { app, render, showPrompt, showDialog } from '../core.js';
+import { app, render, showPrompt, showDialog, showToast } from '../core.js';
 import { loginWithGoogle, loginWithEmail, registerWithEmail, logout } from '../../utils/auth.js';
 import { getLeaderboard, createCommunity, getUserCommunities, pushUserProgress } from '../../utils/social.js';
 import { getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from '../../utils/storage.js';
@@ -70,7 +70,7 @@ function renderLoginScreen() {
   document.getElementById('register-btn').addEventListener('click', async () => {
     const email = document.getElementById('auth-email').value;
     const pass = document.getElementById('auth-password').value;
-    if (!email || !pass) return document.getElementById('auth-error').textContent = "Error"; // Or translated error
+    if (!email || !pass) return document.getElementById('auth-error').textContent = t('auth.fieldsRequired');
     const res = await registerWithEmail(email, pass);
     if (res.error) document.getElementById('auth-error').textContent = res.error;
   });
@@ -161,7 +161,8 @@ function renderCommunity() {
   const inviteBtn = document.getElementById('invite-btn');
   if (inviteBtn) {
     inviteBtn.addEventListener('click', () => {
-      const link = `${window.location.origin}/?invite=${state.activeCommunity}`;
+      const baseUrl = import.meta.env.VITE_APP_URL || 'https://pilates-22dcd.web.app';
+      const link = `${baseUrl}/?invite=${state.activeCommunity}`;
       navigator.clipboard.writeText(link);
       inviteBtn.textContent = t('comm.inviteCopied');
       setTimeout(() => inviteBtn.textContent = t('comm.inviteCopy'), 2000);
@@ -171,7 +172,7 @@ function renderCommunity() {
   document.getElementById('create-group-btn').addEventListener('click', () => {
     showPrompt(
       t('comm.newGroup'),
-      "Name:",
+      t('comm.createPrompt'),
       t('btn.confirm'),
       t('btn.cancel'),
       (name) => {
@@ -179,8 +180,8 @@ function renderCommunity() {
           createCommunity(name.trim()).then(async (code) => {
             state.activeCommunity = code;
             await loadCommunitiesAndLeaderboard();
-            showDialog("Success", "Share this link with your friends.", t('btn.confirm'), null, () => {});
-          }).catch(err => alert(err.message));
+            showDialog(t('comm.createSuccess.title'), t('comm.createSuccess.msg'), t('btn.confirm'), null, () => {});
+          }).catch(err => showToast(err.message || t('comm.createError'), 'error'));
         }
       }
     );

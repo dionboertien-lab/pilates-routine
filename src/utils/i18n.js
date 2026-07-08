@@ -131,11 +131,33 @@ export const translations = {
     'dlg.quit.title': 'Routine stoppen?',
     'dlg.quit.msg': 'Je voortgang voor deze workout gaat verloren.',
     'dlg.quit.confirm': 'Doorgaan',
-    'dlg.quit.cancel': 'Stoppen', // The button that actually stops is the "confirm" action in our code logic. Wait, let's keep it straight: onConfirm stops.
+    'dlg.quit.cancel': 'Stoppen',
     'dlg.reset.title': 'Voortgang resetten?',
     'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
     'dlg.resetAll.title': 'Alles resetten?',
     'dlg.resetAll.msg': 'Je profiel én voortgang worden gewist.',
+
+    // Workout skip/fail
+    'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',
+    'wk.notCompleted.title': 'Niet voltooid',
+    'wk.notCompleted.msg': 'Je hebt meer dan de helft van de oefeningen overgeslagen. Deze workout telt helaas niet mee voor je voortgang.',
+
+    // Community prompts
+    'comm.createPrompt': 'Naam:',
+    'comm.createSuccess.title': 'Groep aangemaakt!',
+    'comm.createSuccess.msg': 'Deel de invite link met je vrienden.',
+    'comm.createError': 'Fout bij maken groep.',
+    'auth.fieldsRequired': 'Vul je e-mail en wachtwoord in.',
+
+    // Settings level labels
+    'set.lvl.1': 'Beginner (Makkelijk)',
+    'set.lvl.2': 'Beginner+',
+    'set.lvl.3': 'Licht Gemiddeld',
+    'set.lvl.4': 'Gemiddeld',
+    'set.lvl.5': 'Gemiddeld+',
+    'set.lvl.6': 'Gevorderd',
+    'set.lvl.7': 'Gevorderd+',
+    'set.lvl.8': 'Expert',
   },
   en: {
     // Shared
@@ -272,6 +294,28 @@ export const translations = {
     'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
     'dlg.resetAll.title': 'Reset everything?',
     'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
+
+    // Workout skip/fail
+    'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',
+    'wk.notCompleted.title': 'Not Completed',
+    'wk.notCompleted.msg': 'You skipped more than half of the exercises. This workout does not count towards your progress.',
+
+    // Community prompts
+    'comm.createPrompt': 'Name:',
+    'comm.createSuccess.title': 'Group created!',
+    'comm.createSuccess.msg': 'Share the invite link with your friends.',
+    'comm.createError': 'Error creating group.',
+    'auth.fieldsRequired': 'Please enter your email and password.',
+
+    // Settings level labels
+    'set.lvl.1': 'Beginner (Easy)',
+    'set.lvl.2': 'Beginner+',
+    'set.lvl.3': 'Light Intermediate',
+    'set.lvl.4': 'Intermediate',
+    'set.lvl.5': 'Intermediate+',
+    'set.lvl.6': 'Advanced',
+    'set.lvl.7': 'Advanced+',
+    'set.lvl.8': 'Expert',
   }
 };
 
