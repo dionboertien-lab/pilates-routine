@@ -495,6 +495,11 @@ function nextStep() {
       state.trackerInterval = null;
     }
     
+    if (state.bluetoothDeviceId) {
+      disconnectHeartRateMonitor(state.bluetoothDeviceId);
+      state.bluetoothDeviceId = null;
+    }
+    
     // Opslaan in localStorage voor het home dashboard
     localStorage.setItem('pilates_last_kcal', Math.floor(state.liveKcal || 120).toString());
     localStorage.setItem('pilates_last_hrv', (Math.floor(Math.random() * 20) + 50).toString());

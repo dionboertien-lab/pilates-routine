@@ -102,6 +102,7 @@ if ('serviceWorker' in navigator) {
 }
 
 import { App as CapacitorApp } from '@capacitor/app';
+import { disconnectHeartRateMonitor } from './utils/bluetooth.js';
 
 CapacitorApp.addListener('backButton', ({ canGoBack }) => {
   if (state.screen === 'home') {
@@ -117,6 +118,14 @@ CapacitorApp.addListener('backButton', ({ canGoBack }) => {
     if (state.timerInterval) {
       clearInterval(state.timerInterval);
       state.timerInterval = null;
+    }
+    if (state.trackerInterval) {
+      clearInterval(state.trackerInterval);
+      state.trackerInterval = null;
+    }
+    if (state.bluetoothDeviceId) {
+      disconnectHeartRateMonitor(state.bluetoothDeviceId);
+      state.bluetoothDeviceId = null;
     }
     state.screen = 'home';
     render();
