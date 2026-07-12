@@ -27,15 +27,15 @@ export const GOAL_INFO = {
 };
 
 function getActiveGoals(profile) {
-  if (!profile || !profile.goals) return ['alles'];
-  const goals = profile.goals.map(g => {
-    if (g === 'legs') return 'billen-benen';
-    if (g === 'core') return 'core';
-    if (g === 'back') return 'rug';
-    return 'alles';
-  });
+  if (!profile) return ['alles'];
+  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
   
-  if (goals.length === 3 || goals.length === 0 || goals.includes('alles')) return ['alles'];
+  const goals = [];
+  if (baseLevels.core > 0) goals.push('core');
+  if (baseLevels['benen-billen'] > 0) goals.push('billen-benen');
+  if (baseLevels['rug-houding'] > 0) goals.push('rug');
+
+  if (goals.length === 3 || goals.length === 0) return ['alles'];
   return goals;
 }
 
@@ -52,15 +52,22 @@ export function getTodaysFocus() {
     };
   }
 
+  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
   const goals = getActiveGoals(profile);
 
   if (goals.includes('alles')) {
-    const sectionIds = ['warmup', 'benen-billen', 'core', 'rug-houding'];
+    const sectionIds = ['warmup'];
+    if (baseLevels.core > 0) sectionIds.push('core');
+    if (baseLevels['benen-billen'] > 0) sectionIds.push('benen-billen');
+    if (baseLevels['rug-houding'] > 0) sectionIds.push('rug-houding');
+    
+    const hasActiveSections = sectionIds.length > 1;
     if (profile.includeStretch !== false) sectionIds.push('stretch');
+    
     return {
       sectionIds,
-      focusLabel: 'Volledige Routine',
-      focusEmoji: '⭐',
+      focusLabel: hasActiveSections ? 'Volledige Routine' : 'Herstel & Stretch',
+      focusEmoji: hasActiveSections ? '⭐' : '🧘',
     };
   }
 

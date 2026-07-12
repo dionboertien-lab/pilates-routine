@@ -26,9 +26,9 @@ const DEFAULT_PROFILE = {
   daysPerWeek: 6,         // 3, 4, 5, 6
   startDate: null,        // ISO date string
   baseLevels: {
-    'core': 1,
-    'benen-billen': 1,
-    'rug-houding': 1
+    'core': 0,
+    'benen-billen': 0,
+    'rug-houding': 0
   },
   includeStretch: true,
   onboardingComplete: false,

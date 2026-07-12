@@ -95,20 +95,6 @@ export function renderSettings() {
         </select>
       </div>
 
-      <div class="settings__group">
-        <label class="settings__label">${t('set.goals') || 'Focusgebieden'}</label>
-        <div class="settings__goals-container" style="display:flex; gap:12px; margin-top:5px; flex-wrap: wrap;">
-          <label style="display:flex; align-items:center; gap:6px; font-size:0.9rem; cursor:pointer;">
-            <input type="checkbox" id="set-goal-legs" value="legs" ${(profile.goals || []).includes('legs') ? 'checked' : ''} /> 🦵 ${t('ob.goals.legs')}
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:0.9rem; cursor:pointer;">
-            <input type="checkbox" id="set-goal-core" value="core" ${(profile.goals || []).includes('core') ? 'checked' : ''} /> 🧱 ${t('ob.goals.core')}
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:0.9rem; cursor:pointer;">
-            <input type="checkbox" id="set-goal-back" value="back" ${(profile.goals || []).includes('back') ? 'checked' : ''} /> 🧘 ${t('ob.goals.back')}
-          </label>
-        </div>
-      </div>
 
       <div class="settings__row">
         <div class="settings__group settings__group--half">
@@ -178,10 +164,6 @@ export function renderSettings() {
     const todayStr = formatDate(new Date());
     if (newDate < todayStr) newDate = todayStr;
 
-    const updatedGoals = [];
-    if (document.getElementById('set-goal-legs').checked) updatedGoals.push('legs');
-    if (document.getElementById('set-goal-core').checked) updatedGoals.push('core');
-    if (document.getElementById('set-goal-back').checked) updatedGoals.push('back');
 
     const updatedProfile = {
       ...profile,
@@ -198,7 +180,6 @@ export function renderSettings() {
         'rug-houding': parseInt(document.getElementById('set-level-rug').value)
       },
       includeStretch: document.getElementById('set-stretch').value === 'true',
-      goals: updatedGoals,
       onboardingComplete: true,
     };
     saveProfile(updatedProfile);
@@ -217,7 +198,7 @@ export function renderSettings() {
         resetAll();
         state.screen = 'onboarding';
         state.onboardingStep = 0;
-        state.onboardingData = { name: '', gender: 'female', dailyMinutes: 15, daysPerWeek: 6, startDate: '', baseLevels: { core: 1, 'benen-billen': 1, 'rug-houding': 1 } };
+        state.onboardingData = { name: '', gender: 'female', dailyMinutes: 15, daysPerWeek: 6, startDate: '', baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } };
         render();
       }
     );
