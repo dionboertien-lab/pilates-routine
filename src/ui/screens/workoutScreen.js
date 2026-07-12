@@ -41,7 +41,7 @@ export function renderWorkout() {
         </div>
       </div>
 
-      <div class="exercise" id="exercise-container">
+      <div class="exercise" id="exercise-container" style="--section-color: ${section.color}">
         <div class="exercise__badges">
           <div class="exercise__section-badge" style="background: ${section.color}22; color: ${section.color}">
             ${section.emoji} ${section.name[lang] || section.name}
@@ -91,24 +91,21 @@ function renderExerciseImage(step) {
       alt="${step.name}"
       onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
     />
-    <div class="exercise__image-placeholder" style="display:none;">
-      ${getExerciseEmoji(step.id)}
+    <div class="exercise__image-placeholder" style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-glass); border-radius:var(--radius-md);">
+      ${getExerciseIcon(step.id)}
     </div>
   `;
 }
 
-function getExerciseEmoji(exerciseId) {
-  const emojiMap = {
-    'cat-cow': '🐱', 'bekken-kantelen': '🌊', 'glute-bridge': '🌉',
-    'donkey-kicks': '🦵', 'fire-hydrants': '🔥', 'side-lying-leg-lift': '🦿',
-    'inner-thigh-lift': '🦵', 'dead-bug': '🪲', 'toe-taps': '🦶',
-    'forearm-plank': '🧱', 'side-plank': '💪', 'the-hundred': '💯',
-    'bird-dog': '🐕', 'swimming': '🏊', 'childs-pose': '🧒',
-    'hip-flexor-stretch': '🦵', 'hamstring-stretch': '🦿',
-    'figure-4-stretch': '4️⃣', 'chest-opener': '🫁',
-    'lunges': '🚶', 'squats': '🏋️', 'calf-raises': '🦵', 'push-ups': '💪', 'commando-planks': '🧱', 'superman-hold': '🦸'
-  };
-  return emojiMap[exerciseId] || '🧘';
+function getExerciseIcon(exerciseId) {
+  // Return an elegant, minimalist abstract SVG shape instead of an emoji
+  return `
+    <svg width="60" height="60" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--sage); opacity: 0.8;">
+      <circle cx="50" cy="50" r="40" stroke-dasharray="2 6" />
+      <path d="M50 20 L80 80 L20 80 Z" stroke-width="1" />
+      <circle cx="50" cy="50" r="10" fill="var(--sage-light)" opacity="0.3" stroke="none" />
+    </svg>
+  `;
 }
 
 function renderInteraction(step) {
@@ -256,6 +253,7 @@ function initializeStep(step) {
   state.timerRunning = false;
   state.exerciseComplete = false;
   state.comboPhase = 'reps';
+  state.lastRepTime = 0;
 
   if (step.type === 'reps') {
     state.repsRemaining = step.reps;
@@ -283,9 +281,15 @@ function attachInteractionListeners(step) {
 
 function handleRepTap() {
   if (state.repsRemaining <= 0) return;
-  state.repsRemaining--;
 
-  if (navigator.vibrate) navigator.vibrate(15);
+  const now = Date.now();
+  if (state.lastRepTime > 0 && (now - state.lastRepTime < 3000)) {
+    showToast(t('wk.tut.tooFast'), 'error');
+    return;
+  }
+  state.lastRepTime = now;
+
+  state.repsRemaining--;
 
   const countEl = document.getElementById('rep-count');
   const tapArea = document.getElementById('rep-tap');
@@ -317,7 +321,6 @@ function handleRepTap() {
     } else {
       setTimeout(() => {
         state.exerciseComplete = true;
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         playBeep();
         render();
       }, 300);
@@ -343,7 +346,6 @@ function handleTimerToggle() {
         state.timerRunning = false;
         state.exerciseComplete = true;
 
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         playBeep();
         
         render();

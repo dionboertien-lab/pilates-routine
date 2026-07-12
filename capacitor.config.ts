@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.pilatestrainer.app',
-  appName: 'Pilates Routine',
+  appId: 'com.dionboertien.pilates',
+  appName: 'Forma',
   webDir: 'dist',
   plugins: {
     GoogleAuth: {

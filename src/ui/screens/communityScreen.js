@@ -4,6 +4,7 @@ import { loginWithGoogle, loginWithEmail, registerWithEmail, logout } from '../.
 import { getLeaderboard, createCommunity, getUserCommunities, pushUserProgress } from '../../utils/social.js';
 import { getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from '../../utils/storage.js';
 import { t } from '../../utils/i18n.js';
+import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
 
 export function renderCommunityWrapper() {
   if (state.authLoading) {
@@ -102,7 +103,6 @@ function renderCommunity() {
   app.innerHTML = `
     <div class="screen community">
       <div class="settings__header">
-        <button class="settings__back-btn" id="comm-back">${t('btn.back')}</button>
         <h2 class="settings__title">${t('comm.title')}</h2>
         <button class="settings__back-btn" id="logout-btn" style="color:var(--rose-dark)">${t('comm.logout')}</button>
       </div>
@@ -145,10 +145,12 @@ function renderCommunity() {
           `}
         `}
       </div>
+      
+      ${getBottomNavHTML('community')}
     </div>
   `;
 
-  document.getElementById('comm-back').addEventListener('click', () => { state.screen = 'home'; render(); });
+  attachBottomNavListeners();
   document.getElementById('logout-btn').addEventListener('click', async () => { await logout(); });
 
   document.querySelectorAll('.community__tab').forEach(tab => {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pilates-routine-v1';
+const CACHE_NAME = 'pilates-routine-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

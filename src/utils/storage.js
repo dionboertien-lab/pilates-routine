@@ -30,6 +30,7 @@ const DEFAULT_PROFILE = {
     'benen-billen': 1,
     'rug-houding': 1
   },
+  includeStretch: true,
   onboardingComplete: false,
 };
 

@@ -26,6 +26,18 @@ export const GOAL_INFO = {
   'alles': { emoji: '⭐', label: 'Alles', color: '#A8C09A' },
 };
 
+function getActiveGoals(profile) {
+  if (!profile || !profile.baseLevels) return ['alles'];
+  const { core = 1, 'benen-billen': legs = 1, 'rug-houding': back = 1 } = profile.baseLevels;
+  let goals = [];
+  if (legs > 0) goals.push('billen-benen');
+  if (core > 0) goals.push('core');
+  if (back > 0) goals.push('rug');
+  
+  if (goals.length === 3 || goals.length === 0) return ['alles'];
+  return goals;
+}
+
 /**
  * Get the sections to train today based on user profile.
  */
@@ -39,11 +51,13 @@ export function getTodaysFocus() {
     };
   }
 
-  const goals = profile.goals || ['alles'];
+  const goals = getActiveGoals(profile);
 
   if (goals.includes('alles')) {
+    const sectionIds = ['warmup', 'benen-billen', 'core', 'rug-houding'];
+    if (profile.includeStretch !== false) sectionIds.push('stretch');
     return {
-      sectionIds: ['warmup', 'benen-billen', 'core', 'rug-houding', 'stretch'],
+      sectionIds,
       focusLabel: 'Volledige Routine',
       focusEmoji: '⭐',
     };
@@ -53,8 +67,10 @@ export function getTodaysFocus() {
     const goal = goals[0];
     const info = GOAL_INFO[goal];
     const mainSections = GOAL_SECTIONS[goal] || [];
+    const sectionIds = ['warmup', ...mainSections];
+    if (profile.includeStretch !== false) sectionIds.push('stretch');
     return {
-      sectionIds: ['warmup', ...mainSections, 'stretch'],
+      sectionIds,
       focusLabel: info.label,
       focusEmoji: info.emoji,
     };
@@ -65,9 +81,11 @@ export function getTodaysFocus() {
   const todayGoal = goals[goalIndex];
   const info = GOAL_INFO[todayGoal];
   const mainSections = GOAL_SECTIONS[todayGoal] || [];
+  const sectionIds = ['warmup', ...mainSections];
+  if (profile.includeStretch !== false) sectionIds.push('stretch');
 
   return {
-    sectionIds: ['warmup', ...mainSections, 'stretch'],
+    sectionIds,
     focusLabel: info.label,
     focusEmoji: info.emoji,
   };
@@ -77,7 +95,7 @@ export function getFocusForDate(dateStr) {
   const profile = getProfile();
   if (!profile) return GOAL_INFO['alles'];
 
-  const goals = profile.goals || ['alles'];
+  const goals = getActiveGoals(profile);
 
   if (goals.includes('alles') || goals.length === 1) {
     const goal = goals.includes('alles') ? 'alles' : goals[0];
@@ -102,7 +120,7 @@ export function getGoalSubtitle() {
   const profile = getProfile();
   if (!profile) return 'Strakke benen & strakke buik';
 
-  const goals = profile.goals || ['alles'];
+  const goals = getActiveGoals(profile);
 
   if (goals.includes('alles')) {
     return 'Strakke benen, sterke core & gezonde rug';

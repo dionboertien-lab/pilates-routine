@@ -5,6 +5,7 @@ import { renderWorkout } from './screens/workoutScreen.js';
 import { renderComplete } from './screens/completeScreen.js';
 import { renderSettings } from './screens/settingsScreen.js';
 import { renderCommunityWrapper } from './screens/communityScreen.js';
+import { renderCoach } from './screens/coachScreen.js';
 
 export const app = document.getElementById('app');
 
@@ -17,16 +18,11 @@ export function render() {
       case 'complete': renderComplete(); break;
       case 'settings': renderSettings(); break;
       case 'community': renderCommunityWrapper(); break;
+      case 'coach': renderCoach(); break;
     }
   };
 
-  if (!document.startViewTransition) {
-    doRender();
-  } else {
-    document.startViewTransition(() => {
-      doRender();
-    });
-  }
+  doRender();
 }
 
 export function escapeHTML(str) {

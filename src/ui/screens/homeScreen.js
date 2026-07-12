@@ -6,6 +6,7 @@ import { getWeekProgression, buildWorkoutSteps } from '../../data/exercises.js';
 import { loadCommunitiesAndLeaderboard } from './communityScreen.js';
 import { t } from '../../utils/i18n.js';
 import confetti from 'canvas-confetti';
+import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
 
 export function renderHome() {
   const profile = getProfile();
@@ -28,13 +29,12 @@ export function renderHome() {
       <div class="home__header">
         <div class="home__top-bar">
           <div class="home__leaf">🌿</div>
-          <div class="home__actions">
-            <button class="home__action-btn" id="community-btn" title="Community" aria-label="Community">🏆</button>
-            <button class="home__action-btn" id="settings-btn" title="${t('set.title')}" aria-label="${t('set.title')}">⚙️</button>
-          </div>
         </div>
         <h1 class="home__title">${t('home.greeting')}${name ? ` ${escapeHTML(name)}` : ''}!</h1>
         <p class="home__subtitle">${subtitle}</p>
+        <div class="home__science-badge" id="science-badge" style="cursor: pointer; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; margin: 10px 0 15px 0; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+          🔬 ${t('home.scienceBadge')}
+        </div>
         <div class="home__meta">
           <div class="home__meta-item">
             <span class="home__meta-value">${profile ? profile.dailyMinutes : 15} min</span>
@@ -73,12 +73,45 @@ export function renderHome() {
             <div class="home__stat-label">${t('home.workouts')}</div>
           </div>
           <div class="home__stat-card">
-            <div class="home__stat-number">${currentWeek}/8</div>
+            <div class="home__ring">
+              <svg viewBox="0 0 36 36">
+                <circle class="home__ring-track" cx="18" cy="18" r="14" />
+                <circle class="home__ring-fill" cx="18" cy="18" r="14"
+                  stroke-dasharray="${2 * Math.PI * 14}"
+                  style="--ring-circumference: ${2 * Math.PI * 14}; --ring-offset: ${2 * Math.PI * 14 * (1 - currentWeek / 8)};"
+                  stroke-dashoffset="${2 * Math.PI * 14}" />
+              </svg>
+              <div class="home__ring-value">${currentWeek}/8</div>
+            </div>
             <div class="home__stat-label">${t('home.weeks')}</div>
           </div>
           <div class="home__stat-card">
             <div class="home__stat-number">${weekProg.label}</div>
             <div class="home__stat-label">${t('home.intensity')}</div>
+          </div>
+        </div>
+
+        <div class="home__biometrics">
+          <div class="home__biometrics-header">
+            <span class="home__biometrics-title">Recovery Status</span>
+            <span class="home__biometrics-source">Oura Ring</span>
+          </div>
+          <div class="home__biometrics-grid">
+            <div class="home__bio-item">
+              <span class="home__bio-val">84</span>
+              <span class="home__bio-lbl">Score</span>
+            </div>
+            <div class="home__bio-item">
+              <span class="home__bio-val">62ms</span>
+              <span class="home__bio-lbl">HRV</span>
+            </div>
+            <div class="home__bio-item">
+              <span class="home__bio-val">420</span>
+              <span class="home__bio-lbl">Active Kcal</span>
+            </div>
+          </div>
+          <div class="home__bio-insight">
+            ✨ Optimal recovery. Ready for a challenging session today.
           </div>
         </div>
       ` : ''}
@@ -88,24 +121,24 @@ export function renderHome() {
       <div class="home__quote">
         <span class="home__quote-heart">♥</span> ${t('home.quote').replace(/♥/g, '')} <span class="home__quote-heart">♥</span>
       </div>
+
+      ${getBottomNavHTML('home')}
     </div>
   `;
 
+  attachBottomNavListeners();
+
   document.getElementById('start-btn').addEventListener('click', startWorkout);
-  document.getElementById('settings-btn').addEventListener('click', () => {
-    state.screen = 'settings';
-    render();
-  });
-  document.getElementById('community-btn').addEventListener('click', async () => {
-    state.screen = 'community';
-    render();
-    if (state.currentUser) {
-      await loadCommunitiesAndLeaderboard();
-    }
-  });
 
   const resetBtn = document.getElementById('reset-btn');
   if (resetBtn) resetBtn.addEventListener('click', handleReset);
+
+  const scienceBadge = document.getElementById('science-badge');
+  if (scienceBadge) {
+    scienceBadge.addEventListener('click', () => {
+      showDialog(t('dlg.science.title'), t('dlg.science.msg'), t('btn.confirm'), null, () => {});
+    });
+  }
 
   if (state.justFinishedWorkout) {
     state.justFinishedWorkout = false;
@@ -147,9 +180,10 @@ function renderCalendar() {
         ${calendarData.map(week => `
           <div class="calendar__row ${week.isCurrent ? 'calendar__row--current' : ''}">
             <span class="calendar__week-label">${week.weekLabel}</span>
-            ${week.days.map(day => {
+            ${week.days.map((day, di) => {
               let cellClass = 'calendar__cell';
               let cellContent = '';
+              const cellIndex = calendarData.indexOf(week) * 7 + di;
 
               if (day.isCompleted) {
                 cellClass += ' calendar__cell--completed';
@@ -164,7 +198,7 @@ function renderCalendar() {
                 cellContent = day.dayNumber || '';
               }
 
-              return `<div class="${cellClass}" title="${day.date || ''}">${cellContent}</div>`;
+              return `<div class="${cellClass}" title="${day.date || ''}" style="--i: ${cellIndex}">${cellContent}</div>`;
             }).join('')}
           </div>
         `).join('')}

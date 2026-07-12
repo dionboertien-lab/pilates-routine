@@ -1,7 +1,7 @@
 import { state } from '../../state.js';
 import { app, render, escapeHTML } from '../core.js';
 import { saveProfile, formatDate } from '../../utils/storage.js';
-import { t } from '../../utils/i18n.js';
+import { t, getLanguage } from '../../utils/i18n.js';
 
 export function renderOnboarding() {
   const step = state.onboardingStep || 0;
@@ -11,10 +11,9 @@ export function renderOnboarding() {
   const steps = [
     renderStep0,
     renderStep1,
-    renderStep2,
-    renderStep3,
-    renderStep4,
-    renderStep5,
+    renderStep2, // previously 3 (levels)
+    renderStep3, // previously 4 (time)
+    renderStep4, // previously 5 (start date)
   ];
 
   app.innerHTML = `
@@ -62,20 +61,6 @@ function renderStep1() {
 }
 
 function renderStep2() {
-  const goals = state.onboardingData.goals;
-  return `
-    <h2 class="onboarding__title">${t('ob.goals.title')}</h2>
-    <p class="onboarding__subtitle">${t('ob.goals.sub')}</p>
-    <div class="onboarding__options" id="ob-goals-options">
-      ${renderOption('goal', 'benen-billen', '🦵', t('ob.goals.legs'), goals.includes('benen-billen'))}
-      ${renderOption('goal', 'core', '🧱', t('ob.goals.core'), goals.includes('core'))}
-      ${renderOption('goal', 'rug-houding', '🧘', t('ob.goals.back'), goals.includes('rug-houding'))}
-      ${renderOption('goal', 'alles', '⭐', t('ob.goals.all'), goals.includes('alles'))}
-    </div>
-  `;
-}
-
-function renderStep3() {
   const data = state.onboardingData;
   return `
     <h2 class="onboarding__title">${t('ob.level.title')}</h2>
@@ -84,6 +69,7 @@ function renderStep3() {
     <div class="onboarding__group">
       <label class="onboarding__label">${t('set.lvl.core')}</label>
       <select class="settings__input" id="ob-level-core">
+        <option value="0" ${data.baseLevels.core === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
         <option value="1" ${data.baseLevels.core === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
         <option value="4" ${data.baseLevels.core === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
         <option value="6" ${data.baseLevels.core === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
@@ -93,6 +79,7 @@ function renderStep3() {
     <div class="onboarding__group">
       <label class="onboarding__label">${t('set.lvl.legs')}</label>
       <select class="settings__input" id="ob-level-benen">
+        <option value="0" ${data.baseLevels['benen-billen'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
         <option value="1" ${data.baseLevels['benen-billen'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
         <option value="4" ${data.baseLevels['benen-billen'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
         <option value="6" ${data.baseLevels['benen-billen'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
@@ -102,6 +89,7 @@ function renderStep3() {
     <div class="onboarding__group">
       <label class="onboarding__label">${t('set.lvl.back')}</label>
       <select class="settings__input" id="ob-level-rug">
+        <option value="0" ${data.baseLevels['rug-houding'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
         <option value="1" ${data.baseLevels['rug-houding'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
         <option value="4" ${data.baseLevels['rug-houding'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
         <option value="6" ${data.baseLevels['rug-houding'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
@@ -110,9 +98,12 @@ function renderStep3() {
   `;
 }
 
-function renderStep4() {
+function renderStep3() {
   const min = state.onboardingData.dailyMinutes;
   const days = state.onboardingData.daysPerWeek;
+  const stretch = state.onboardingData.includeStretch !== false;
+  const lang = getLanguage();
+  
   return `
     <h2 class="onboarding__title">${t('ob.time.title')}</h2>
     <p class="onboarding__subtitle">${t('ob.time.sub')}</p>
@@ -133,10 +124,17 @@ function renderStep4() {
         ${renderOption('days', 6, '📅', '6 dgn', days === 6)}
       </div>
     </div>
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('set.stretch')}</label>
+      <div class="onboarding__options" id="ob-stretch-options">
+        ${renderOption('stretch', 'true', '✅', lang === 'nl' ? 'Ja' : 'Yes', stretch === true)}
+        ${renderOption('stretch', 'false', '❌', lang === 'nl' ? 'Nee' : 'No', stretch === false)}
+      </div>
+    </div>
   `;
 }
 
-function renderStep5() {
+function renderStep4() {
   const minDate = formatDate(new Date());
   return `
     <h2 class="onboarding__title">${t('ob.start.title')}</h2>
@@ -159,7 +157,6 @@ function renderOption(type, value, emoji, label, isSelected) {
 function canProceed(step, data) {
   if (step === 0 && !data.name.trim()) return false;
   if (step === 1 && !data.gender) return false;
-  if (step === 2 && data.goals.length === 0) return false;
   return true;
 }
 
@@ -178,7 +175,7 @@ function attachOnboardingListeners(step) {
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
       saveStepData(step);
-      if (step === 5) {
+      if (step === 4) {
         completeOnboarding();
       } else {
         state.onboardingStep++;
@@ -200,23 +197,7 @@ function attachOnboardingListeners(step) {
         render();
       });
     });
-  } else if (step === 2) {
-    document.querySelectorAll('#ob-goals-options .onboarding__option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const goal = btn.dataset.goal;
-        if (goal === 'alles') {
-          state.onboardingData.goals = ['alles'];
-        } else {
-          let goals = state.onboardingData.goals.filter(g => g !== 'alles');
-          if (goals.includes(goal)) goals = goals.filter(g => g !== goal);
-          else goals.push(goal);
-          if (goals.length === 0) goals = ['alles'];
-          state.onboardingData.goals = goals;
-        }
-        render();
-      });
-    });
-  } else if (step === 4) {
+  } else if (step === 3) {
     document.querySelectorAll('#ob-min-options .onboarding__option').forEach(btn => {
       btn.addEventListener('click', () => {
         state.onboardingData.dailyMinutes = parseInt(btn.dataset.min);
@@ -229,19 +210,25 @@ function attachOnboardingListeners(step) {
         render();
       });
     });
+    document.querySelectorAll('#ob-stretch-options .onboarding__option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.onboardingData.includeStretch = btn.dataset.stretch === 'true';
+        render();
+      });
+    });
   }
 }
 
 function saveStepData(step) {
   if (step === 0) {
     state.onboardingData.name = document.getElementById('ob-name').value.trim();
-  } else if (step === 3) {
+  } else if (step === 2) {
     state.onboardingData.baseLevels = {
       core: parseInt(document.getElementById('ob-level-core').value),
       'benen-billen': parseInt(document.getElementById('ob-level-benen').value),
       'rug-houding': parseInt(document.getElementById('ob-level-rug').value),
     };
-  } else if (step === 5) {
+  } else if (step === 4) {
     state.onboardingData.startDate = document.getElementById('ob-start-date').value;
   }
 }

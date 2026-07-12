@@ -13,6 +13,10 @@ export const translations = {
     'btn.start': '▶ Start',
     'btn.pause': '⏸ Pauze',
     'btn.finish': 'Afronden ✓',
+    'nav.home': 'Home',
+    'nav.coach': 'Coach',
+    'nav.community': 'Community',
+    'nav.settings': 'Instellingen',
     
     // Home
     'home.greeting': 'Hoi',
@@ -25,6 +29,7 @@ export const translations = {
     'home.workouts': 'Workouts',
     'home.weeks': 'Weken',
     'home.intensity': 'Intensiteit',
+    'home.scienceBadge': 'Science-Backed (TUT)',
     'home.quote': '♥ Jouw consistentie vandaag, is je resultaat morgen. ♥',
     
     // Calendar
@@ -74,6 +79,7 @@ export const translations = {
     'set.lvl.back': 'Niveau Rug & Houding',
     'set.gender': 'Geslacht',
     'set.goals': 'Focusgebieden',
+    'set.stretch': 'Inclusief stretch',
     'set.resetAll': 'Alles resetten & opnieuw beginnen',
     'set.language': 'Taal',
     'set.theme': 'Thema',
@@ -85,7 +91,8 @@ export const translations = {
     'wk.nextSection': 'Volgende sectie',
     'wk.hold': '🔒 Houd vast!',
     'wk.ofReps': 'van {0} reps',
-    'wk.tapHint': 'Tik om af te tellen',
+    'wk.tapHint': 'Langzaam: ±4 sec. per rep',
+    'wk.tut.tooFast': 'Te snel! Behoud de spierspanning (Time Under Tension).',
     'wk.seconds': 'seconden',
     'wk.intro.encouragement1': 'Laten we beginnen, {0}! 🌿',
     'wk.intro.encouragement2': 'Goed bezig, {0}! 💪',
@@ -136,6 +143,8 @@ export const translations = {
     'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
     'dlg.resetAll.title': 'Alles resetten?',
     'dlg.resetAll.msg': 'Je profiel én voortgang worden gewist.',
+    'dlg.science.title': '🔬 De Wetenschap achter de Routine',
+    'dlg.science.msg': 'Deze app maakt gebruik van <b>Time Under Tension (TUT)</b> en <b>Progressive Overload</b>.<br><br><b>TUT:</b> Door langzaam en gecontroleerd te bewegen elimineer je momentum, wat zorgt voor een veel hogere spieractivatie en metabole stress.<br><b>Progressive Overload:</b> De app verhoogt wekelijks de moeilijkheidsgraad, waardoor je lichaam gedwongen wordt om zich aan te passen (sterker te worden).<br><br>Daarom is snel klikken geblokkeerd. Geniet van de spierpijn!',
 
     // Workout skip/fail
     'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',
@@ -150,6 +159,7 @@ export const translations = {
     'auth.fieldsRequired': 'Vul je e-mail en wachtwoord in.',
 
     // Settings level labels
+    'set.lvl.0': 'Uit (Niet trainen)',
     'set.lvl.1': 'Beginner (Makkelijk)',
     'set.lvl.2': 'Beginner+',
     'set.lvl.3': 'Licht Gemiddeld',
@@ -171,6 +181,10 @@ export const translations = {
     'btn.start': '▶ Start',
     'btn.pause': '⏸ Pause',
     'btn.finish': 'Finish ✓',
+    'nav.home': 'Home',
+    'nav.coach': 'Coach',
+    'nav.community': 'Community',
+    'nav.settings': 'Settings',
 
     // Home
     'home.greeting': 'Hi',
@@ -183,6 +197,7 @@ export const translations = {
     'home.workouts': 'Workouts',
     'home.weeks': 'Weeks',
     'home.intensity': 'Intensity',
+    'home.scienceBadge': 'Science-Backed (TUT)',
     'home.quote': '♥ Your consistency today is your result tomorrow. ♥',
 
     // Calendar
@@ -232,6 +247,7 @@ export const translations = {
     'set.lvl.back': 'Level Back & Posture',
     'set.gender': 'Gender',
     'set.goals': 'Focus Areas',
+    'set.stretch': 'Include stretch',
     'set.resetAll': 'Reset Everything & Start Over',
     'set.language': 'Language',
     'set.theme': 'Theme',
@@ -243,7 +259,8 @@ export const translations = {
     'wk.nextSection': 'Next section',
     'wk.hold': '🔒 Hold it!',
     'wk.ofReps': 'of {0} reps',
-    'wk.tapHint': 'Tap to count down',
+    'wk.tapHint': 'Slow: ±4 sec. per rep',
+    'wk.tut.tooFast': 'Too fast! Maintain Time Under Tension (TUT).',
     'wk.seconds': 'seconds',
     'wk.intro.encouragement1': "Let's begin, {0}! 🌿",
     'wk.intro.encouragement2': 'Great job, {0}! 💪',
@@ -294,6 +311,8 @@ export const translations = {
     'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
     'dlg.resetAll.title': 'Reset everything?',
     'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
+    'dlg.science.title': '🔬 The Science behind the Routine',
+    'dlg.science.msg': 'This app relies on <b>Time Under Tension (TUT)</b> and <b>Progressive Overload</b>.<br><br><b>TUT:</b> Moving slowly and with control eliminates momentum, causing significantly higher muscle activation and metabolic stress.<br><b>Progressive Overload:</b> The app increases difficulty weekly, forcing your body to adapt (grow stronger).<br><br>This is why fast clicking is blocked. Enjoy the burn!',
 
     // Workout skip/fail
     'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',
@@ -308,6 +327,7 @@ export const translations = {
     'auth.fieldsRequired': 'Please enter your email and password.',
 
     // Settings level labels
+    'set.lvl.0': 'Off (Do not train)',
     'set.lvl.1': 'Beginner (Easy)',
     'set.lvl.2': 'Beginner+',
     'set.lvl.3': 'Light Intermediate',

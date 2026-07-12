@@ -53,14 +53,14 @@ export function getWeekProgression(currentWeek, baseLevel = 1) {
   const effectiveLevel = Math.min(8, baseLevel + currentWeek - 1);
   
   const LEVELS = {
-    1: { id: 'l1', label: 'Beginner', mult: 0.5 },
-    2: { id: 'l2', label: 'Beginner+', mult: 0.65 },
-    3: { id: 'l3', label: 'Licht Gemiddeld', mult: 0.8 },
-    4: { id: 'l4', label: 'Gemiddeld', mult: 1.0 },
-    5: { id: 'l5', label: 'Gemiddeld+', mult: 1.5 },
-    6: { id: 'l6', label: 'Gevorderd', mult: 2.0 },
-    7: { id: 'l7', label: 'Gevorderd+', mult: 2.5 },
-    8: { id: 'l8', label: 'Expert', mult: 3.5 },
+    1: { id: 'l1', label: 'Beginner', mult: 0.6 },
+    2: { id: 'l2', label: 'Beginner+', mult: 0.8 },
+    3: { id: 'l3', label: 'Licht Gemiddeld', mult: 1.0 },
+    4: { id: 'l4', label: 'Gemiddeld', mult: 1.2 },
+    5: { id: 'l5', label: 'Gemiddeld+', mult: 1.8 },
+    6: { id: 'l6', label: 'Gevorderd', mult: 2.5 },
+    7: { id: 'l7', label: 'Gevorderd+', mult: 3.0 },
+    8: { id: 'l8', label: 'Expert', mult: 4.0 },
   };
 
   return LEVELS[effectiveLevel] || LEVELS[1];
@@ -134,7 +134,7 @@ export const EXERCISES = [
     perSide: false,
     image: 'glute-bridge',
     targetGender: 'all',
-    instruction: 'Lig op je rug. Adem uit en duw je heupen omhoog. Knijp je billen samen. Adem in en laat langzaam zakken. Houd bovenaan de laatste herhaling vast.',
+    instruction: 'Tempo 3-1-3: Lig op je rug. Adem uit en duw heupen 3 sec omhoog. Knijp billen samen (1 sec). Laat in 3 sec zakken. Houd bovenaan de laatste rep vast.',
   },
   // Female focus
   {
@@ -147,7 +147,7 @@ export const EXERCISES = [
     sideLabel: 'been',
     image: 'donkey-kicks',
     targetGender: 'female',
-    instruction: 'Op handen en knieën. Adem uit, til één been op met de knie 90 graden en duw je hiel naar het plafond. Adem in bij het terugzakken.',
+    instruction: 'TUT Focus: Op handen/knieën. Adem uit, til been op (3 sec) met knie op 90 graden. Duw hiel naar plafond. Zak in 3 sec terug.',
   },
   {
     id: 'fire-hydrants',
@@ -159,7 +159,7 @@ export const EXERCISES = [
     sideLabel: 'been',
     image: 'fire-hydrants',
     targetGender: 'female',
-    instruction: 'Op handen en knieën. Adem uit en til je knie zijwaarts op (zonder je bekken in te draaien). Adem in en laat weer zakken.',
+    instruction: 'Tempo 3-1-3: Op handen/knieën. Adem uit, til knie zijwaarts op (3 sec). Houd vast en laat langzaam in 3 sec zakken.',
   },
   {
     id: 'inner-thigh-lift',
@@ -184,7 +184,7 @@ export const EXERCISES = [
     sideLabel: 'been',
     image: 'lunges',
     targetGender: 'male',
-    instruction: 'Adem in en stap met één been naar voren. Zak door je heupen. Adem uit en duw jezelf weer krachtig omhoog.',
+    instruction: 'Tempo 3-1-3: Adem in en stap naar voren. Zak in 3 sec door heupen. Adem uit, duw jezelf krachtig omhoog (Mind-Muscle Connection).',
   },
   {
     id: 'squats',
@@ -195,7 +195,7 @@ export const EXERCISES = [
     perSide: false,
     image: 'squats',
     targetGender: 'male',
-    instruction: 'Voeten op schouderbreedte. Adem in en zak door je knieën. Adem uit, span je billen aan en kom weer rechtstaan.',
+    instruction: 'Tempo 3-1-3: Voeten op schouderbreedte. Zak in 3 sec door knieën. Adem uit, span billen aan en kom gecontroleerd omhoog.',
   },
   {
     id: 'calf-raises',
@@ -234,7 +234,7 @@ export const EXERCISES = [
     sideLabel: 'kant',
     image: 'dead-bug',
     targetGender: 'all',
-    instruction: 'Lig op je rug, knieën in tabletop. Adem in en strek tegelijk je rechterarm en linkerbeen. Adem uit en breng ze terug. Wissel.',
+    instruction: 'TUT Focus: Lig op je rug, knieën tabletop. Strek langzaam (3 sec) arm en been. Adem uit, breng in 3 sec terug. Wissel. Houd core altijd op spanning.',
   },
   {
     id: 'forearm-plank',
@@ -258,7 +258,7 @@ export const EXERCISES = [
     sideLabel: 'kant',
     image: 'toe-taps',
     targetGender: 'female',
-    instruction: 'Lig op je rug, knieën 90 graden. Tik één voet rustig op de grond. Terug en wissel.',
+    instruction: 'TUT Focus: Lig op je rug, knieën 90 graden. Tik één voet in 3 sec naar de grond (constante buikspanning). Wissel langzaam.',
   },
   {
     id: 'the-hundred',
@@ -321,7 +321,7 @@ export const EXERCISES = [
     sideLabel: 'kant',
     image: 'bird-dog',
     targetGender: 'all',
-    instruction: 'Op handen en knieën. Strek tegelijk je rechterarm naar voren en linkerbeen naar achteren.',
+    instruction: 'Tempo 3-1-3: Op handen/knieën. Strek langzaam (3 sec) arm naar voren, been naar achteren. Voel de contractie. Terug in 3 sec.',
   },
   {
     id: 'swimming',

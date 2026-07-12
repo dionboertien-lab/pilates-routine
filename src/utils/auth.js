@@ -17,15 +17,17 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 // Detect if running inside Capacitor (native app)
 function isNativeApp() {
-  return window.Capacitor !== undefined;
+  return window.Capacitor?.isNative === true;
 }
 
-// Initialize GoogleAuth on all platforms
-GoogleAuth.initialize({
-  clientId: '443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com',
-  scopes: ['profile', 'email'],
-  grantOfflineAccess: true,
-});
+// Initialize GoogleAuth only on web platform (native platforms use configuration files and crash on initialize)
+if (!isNativeApp()) {
+  GoogleAuth.initialize({
+    clientId: '443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
+    grantOfflineAccess: true,
+  });
+}
 
 export function subscribeToAuth(callback) {
   // Check for redirect result on app load (for native flow, if we ever fallback)
