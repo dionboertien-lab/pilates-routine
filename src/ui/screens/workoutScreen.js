@@ -1,11 +1,12 @@
 import { state } from '../../state.js';
 import { app, render, showDialog, showToast, playBeep } from '../core.js';
-import { getUserName, getProfile, markTodayComplete } from '../../utils/storage.js';
+import { getUserName, getProfile, markTodayComplete, getTotalCompleted, getMissedWorkouts } from '../../utils/storage.js';
 import { getSection, getWeekProgression, buildWorkoutSteps } from '../../data/exercises.js';
 import { getCurrentWeek } from '../../utils/storage.js';
 import { getTodaysFocus } from '../../utils/scheduler.js';
 import { t, getLanguage } from '../../utils/i18n.js';
 import { connectHeartRateMonitor, disconnectHeartRateMonitor } from '../../utils/bluetooth.js';
+import { pushUserProgress } from '../../utils/social.js';
 
 export function renderWorkout() {
   const steps = state.workoutSteps;
@@ -507,6 +508,19 @@ function nextStep() {
 
     const focus = state.todayFocus;
     markTodayComplete(focus ? focus.focusEmoji : '✓');
+    
+    // Push score to Firebase immediately upon completion (only once!)
+    const profile = getProfile();
+    if (profile) {
+      const progressData = {
+        name: profile.name,
+        totalWorkouts: getTotalCompleted(),
+        missedWorkouts: getMissedWorkouts(),
+        currentWeek: currentWeek
+      };
+      console.log('[Workout] Pushing progress to Firebase:', progressData);
+      pushUserProgress(progressData);
+    }
     state.screen = 'complete';
     render();
     return;

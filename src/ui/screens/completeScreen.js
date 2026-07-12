@@ -11,18 +11,6 @@ export function renderComplete() {
   const totalCompleted = getTotalCompleted();
   const currentWeek = getCurrentWeek();
 
-  // Push score to Firebase immediately when reaching completion screen
-  const profile = getProfile();
-  if (profile) {
-    const progressData = {
-      name: profile.name,
-      totalWorkouts: totalCompleted,
-      missedWorkouts: getMissedWorkouts(),
-      currentWeek: currentWeek
-    };
-    console.log('[Complete] Pushing progress to Firebase:', progressData);
-    pushUserProgress(progressData);
-  }
 
   const messages = [
     t('comp.msg1', n),

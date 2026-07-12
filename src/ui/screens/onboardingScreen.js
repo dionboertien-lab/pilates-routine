@@ -11,6 +11,7 @@ export function renderOnboarding() {
   const steps = [
     renderStep0,
     renderStep1,
+    renderStepGoals,
     renderStep2, // previously 3 (levels)
     renderStep3, // previously 4 (time)
     renderStep4, // previously 5 (start date)
@@ -56,6 +57,19 @@ function renderStep1() {
       ${renderOption('gender', 'female', '👩', t('ob.gender.f'), state.onboardingData.gender === 'female')}
       ${renderOption('gender', 'male', '👨', t('ob.gender.m'), state.onboardingData.gender === 'male')}
       ${renderOption('gender', 'neutral', '🧑', t('ob.gender.n'), state.onboardingData.gender === 'neutral')}
+    </div>
+  `;
+}
+
+function renderStepGoals() {
+  const goals = state.onboardingData.goals || [];
+  return `
+    <h2 class="onboarding__title">${t('ob.goals.title')}</h2>
+    <p class="onboarding__subtitle">${t('ob.goals.sub')}</p>
+    <div class="onboarding__options" id="ob-goals-options">
+      ${renderOption('goal', 'legs', '🦵', t('ob.goals.legs'), goals.includes('legs'))}
+      ${renderOption('goal', 'core', '🧱', t('ob.goals.core'), goals.includes('core'))}
+      ${renderOption('goal', 'back', '🧘', t('ob.goals.back'), goals.includes('back'))}
     </div>
   `;
 }
@@ -175,7 +189,7 @@ function attachOnboardingListeners(step) {
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
       saveStepData(step);
-      if (step === 4) {
+      if (step === steps.length - 1) {
         completeOnboarding();
       } else {
         state.onboardingStep++;
@@ -197,7 +211,21 @@ function attachOnboardingListeners(step) {
         render();
       });
     });
-  } else if (step === 3) {
+  } else if (step === 2) {
+    document.querySelectorAll('#ob-goals-options .onboarding__option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const goal = btn.dataset.goal;
+        let goals = [...(state.onboardingData.goals || [])];
+        if (goals.includes(goal)) {
+          goals = goals.filter(g => g !== goal);
+        } else {
+          goals.push(goal);
+        }
+        state.onboardingData.goals = goals;
+        render();
+      });
+    });
+  } else if (step === 4) {
     document.querySelectorAll('#ob-min-options .onboarding__option').forEach(btn => {
       btn.addEventListener('click', () => {
         state.onboardingData.dailyMinutes = parseInt(btn.dataset.min);
@@ -222,13 +250,13 @@ function attachOnboardingListeners(step) {
 function saveStepData(step) {
   if (step === 0) {
     state.onboardingData.name = document.getElementById('ob-name').value.trim();
-  } else if (step === 2) {
+  } else if (step === 3) {
     state.onboardingData.baseLevels = {
       core: parseInt(document.getElementById('ob-level-core').value),
       'benen-billen': parseInt(document.getElementById('ob-level-benen').value),
       'rug-houding': parseInt(document.getElementById('ob-level-rug').value),
     };
-  } else if (step === 4) {
+  } else if (step === 5) {
     state.onboardingData.startDate = document.getElementById('ob-start-date').value;
   }
 }
