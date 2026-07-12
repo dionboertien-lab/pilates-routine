@@ -93,25 +93,25 @@ export function renderHome() {
 
         <div class="home__biometrics">
           <div class="home__biometrics-header">
-            <span class="home__biometrics-title">Recovery Status</span>
-            <span class="home__biometrics-source">Oura Ring</span>
+            <span class="home__biometrics-title">Herstelstatus</span>
+            <span class="home__biometrics-source">Smartwatch</span>
           </div>
           <div class="home__biometrics-grid">
             <div class="home__bio-item">
-              <span class="home__bio-val">84</span>
+              <span class="home__bio-val">${localStorage.getItem('pilates_last_score') || '84'}</span>
               <span class="home__bio-lbl">Score</span>
             </div>
             <div class="home__bio-item">
-              <span class="home__bio-val">62ms</span>
+              <span class="home__bio-val">${localStorage.getItem('pilates_last_hrv') || '62'}ms</span>
               <span class="home__bio-lbl">HRV</span>
             </div>
             <div class="home__bio-item">
-              <span class="home__bio-val">420</span>
-              <span class="home__bio-lbl">Active Kcal</span>
+              <span class="home__bio-val">${localStorage.getItem('pilates_last_kcal') || '420'}</span>
+              <span class="home__bio-lbl">Kcal</span>
             </div>
           </div>
           <div class="home__bio-insight">
-            ✨ Optimal recovery. Ready for a challenging session today.
+            ✨ ${localStorage.getItem('pilates_last_insight') || 'Optimaal herstel. Klaar voor een pittige sessie vandaag.'}
           </div>
         </div>
       ` : ''}
@@ -122,9 +122,9 @@ export function renderHome() {
         <span class="home__quote-heart">♥</span> ${t('home.quote').replace(/♥/g, '')} <span class="home__quote-heart">♥</span>
       </div>
 
+      </div>
       ${getBottomNavHTML('home')}
-    </div>
-  `;
+    `;
 
   attachBottomNavListeners();
 

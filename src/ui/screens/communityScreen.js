@@ -1,5 +1,5 @@
 import { state } from '../../state.js';
-import { app, render, showPrompt, showDialog, showToast } from '../core.js';
+import { app, render, showPrompt, showDialog, showToast, escapeHTML } from '../core.js';
 import { loginWithGoogle, loginWithEmail, registerWithEmail, logout } from '../../utils/auth.js';
 import { getLeaderboard, createCommunity, getUserCommunities, pushUserProgress } from '../../utils/social.js';
 import { getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from '../../utils/storage.js';
@@ -30,7 +30,7 @@ function renderLoginScreen() {
         <div class="auth__icon">🏆</div>
         <h2 class="auth__title">${t('auth.title')}</h2>
         <p class="auth__subtitle">
-          ${inviteCode ? t('auth.sub2', inviteCode) : t('auth.sub1')}
+          ${inviteCode ? t('auth.sub2', escapeHTML(inviteCode)) : t('auth.sub1')}
         </p>
         
         <button class="auth__btn auth__btn--google" id="login-google">
@@ -110,7 +110,7 @@ function renderCommunity() {
       <div class="community__tabs">
         ${state.myCommunities.map(c => `
           <button class="community__tab ${state.activeCommunity === c.id ? 'community__tab--active' : ''}" data-cid="${c.id}">
-            ${c.name}
+            ${escapeHTML(c.name)}
           </button>
         `).join('')}
       </div>
@@ -131,7 +131,7 @@ function renderCommunity() {
               <div class="community__user">
                 <div class="community__rank" style="color: ${rankColor}">${index + 1}</div>
                 <div class="community__user-info">
-                  <div class="community__user-name">${user.name} ${user.id === state.currentUser.uid ? t('comm.you') : ''}</div>
+                  <div class="community__user-name">${escapeHTML(user.name)} ${user.id === state.currentUser.uid ? t('comm.you') : ''}</div>
                   <div class="community__user-meta">${t('comm.week')} ${user.currentWeek} · ${t('comm.lastActive')} ${user.lastActive}</div>
                   ${user.missedWorkouts > 0 ? `<div class="community__user-meta" style="color: var(--rose-dark);">😴 ${user.missedWorkouts} ${t('comm.missed')}</div>` : ''}
                 </div>
@@ -146,9 +146,9 @@ function renderCommunity() {
         `}
       </div>
       
+      </div>
       ${getBottomNavHTML('community')}
-    </div>
-  `;
+    `;
 
   attachBottomNavListeners();
   document.getElementById('logout-btn').addEventListener('click', async () => { await logout(); });

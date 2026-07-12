@@ -137,9 +137,9 @@ export function renderSettings() {
         <button class="settings__reset-all-btn" id="settings-reset-all">${t('set.resetAll')}</button>
       </div>
 
+      </div>
       ${getBottomNavHTML('settings')}
-    </div>
-  `;
+    `;
 
   attachBottomNavListeners();
 
