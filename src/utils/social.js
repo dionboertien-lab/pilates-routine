@@ -76,11 +76,17 @@ export async function pushUserProgress(data) {
 
   try {
     const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+    let remoteTotal = 0;
+    if (userSnap.exists()) {
+      remoteTotal = userSnap.data().totalWorkouts || 0;
+    }
+    
     const displayName = data.name && data.name.trim() !== '' ? data.name.trim() : 'Pilates Fan';
 
     await setDoc(userRef, {
       name: displayName,
-      totalWorkouts: data.totalWorkouts || 0,
+      totalWorkouts: Math.max(remoteTotal, data.totalWorkouts || 0),
       currentWeek: data.currentWeek || 1,
       missedWorkouts: data.missedWorkouts || 0,
       lastActive: serverTimestamp()

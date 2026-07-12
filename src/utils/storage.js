@@ -40,7 +40,13 @@ const DEFAULT_PROFILE = {
 export function getProfile() {
   const stored = localStorage.getItem(STORAGE_KEYS.PROFILE);
   if (stored) {
-    const parsed = JSON.parse(stored);
+    let parsed;
+    try {
+      parsed = JSON.parse(stored);
+    } catch (e) {
+      console.error('Failed to parse profile', e);
+      return null;
+    }
     const profile = { ...DEFAULT_PROFILE, ...parsed };
     
     // Migrate old baseLevel to new baseLevels if necessary
@@ -93,7 +99,8 @@ export function getUserName() {
 export function getProgramStartDate() {
   const profile = getProfile();
   if (profile && profile.startDate) {
-    return new Date(profile.startDate);
+    const [year, month, day] = profile.startDate.split('-');
+    return new Date(year, month - 1, day);
   }
   return null;
 }
@@ -119,7 +126,13 @@ export function setStartDate(dateStr) {
 export function getCompletedDays() {
   const stored = localStorage.getItem(STORAGE_KEYS.COMPLETED_DAYS);
   if (stored) {
-    const parsed = JSON.parse(stored);
+    let parsed;
+    try {
+      parsed = JSON.parse(stored);
+    } catch (e) {
+      console.error('Failed to parse completed days', e);
+      return {};
+    }
     // Support both old format (array of strings) and new (object with focus)
     if (Array.isArray(parsed)) {
       const map = {};

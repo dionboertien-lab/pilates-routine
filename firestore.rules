@@ -2,15 +2,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      // Anyone logged in can read (needed for leaderboard and group logic).
       allow read: if request.auth != null;
-      // Users can only update their own documents.
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // Users can only update their own documents. We prevent totalWorkouts from decreasing (XR.2, XR.8 protection).
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && (resource == null || !('totalWorkouts' in request.resource.data) || !('totalWorkouts' in resource.data) || request.resource.data.totalWorkouts >= resource.data.totalWorkouts);
+                   
+      match /chats/{chatId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     match /communities/{communityId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      // Ensure ownerId is the creator (XR.2)
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
     }
   }

@@ -4,7 +4,7 @@
  */
 
 import { SECTIONS } from '../data/exercises.js';
-import { getProfile, getProgramStartDate, formatDate } from './storage.js';
+import { getProfile, getProgramStartDate, formatDate, getTotalCompleted } from './storage.js';
 
 /**
  * Goal ID to section mapping.
@@ -27,14 +27,15 @@ export const GOAL_INFO = {
 };
 
 function getActiveGoals(profile) {
-  if (!profile || !profile.baseLevels) return ['alles'];
-  const { core = 1, 'benen-billen': legs = 1, 'rug-houding': back = 1 } = profile.baseLevels;
-  let goals = [];
-  if (legs > 0) goals.push('billen-benen');
-  if (core > 0) goals.push('core');
-  if (back > 0) goals.push('rug');
+  if (!profile || !profile.goals) return ['alles'];
+  const goals = profile.goals.map(g => {
+    if (g === 'legs') return 'billen-benen';
+    if (g === 'core') return 'core';
+    if (g === 'back') return 'rug';
+    return 'alles';
+  });
   
-  if (goals.length === 3 || goals.length === 0) return ['alles'];
+  if (goals.length === 3 || goals.length === 0 || goals.includes('alles')) return ['alles'];
   return goals;
 }
 
@@ -139,13 +140,5 @@ export function getGoalSubtitle() {
 }
 
 function getWorkoutDayIndex() {
-  const startDate = getProgramStartDate();
-  if (!startDate) return 0;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
-
-  return Math.max(0, Math.floor((today - start) / (1000 * 60 * 60 * 24)));
+  return getTotalCompleted();
 }

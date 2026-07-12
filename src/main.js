@@ -3,23 +3,47 @@ import { state } from './state.js';
 import { render } from './ui/core.js';
 import { isOnboardingComplete } from './utils/storage.js';
 import { subscribeToAuth } from './utils/auth.js';
-import { getLeaderboard, getUserCommunities } from './utils/social.js';
+import { getLeaderboard, getUserCommunities, initializeSocialUser, joinCommunity } from './utils/social.js';
 
 // Setup auth listener
 subscribeToAuth(async (user) => {
   state.currentUser = user;
   state.authLoading = false;
-  if (user && state.screen === 'community') {
-    state.loadingLeaderboard = true;
-    render();
-    state.myCommunities = await getUserCommunities();
-    state.leaderboard = await getLeaderboard(state.activeCommunity);
-    state.loadingLeaderboard = false;
-    render();
+  if (user) {
+    await initializeSocialUser();
+    
+    const pendingInvite = localStorage.getItem('pilates_pending_invite');
+    if (pendingInvite) {
+      try {
+        await joinCommunity(pendingInvite);
+        localStorage.removeItem('pilates_pending_invite');
+        state.activeCommunity = pendingInvite;
+      } catch (e) {
+        console.warn('Could not join community from invite:', e);
+      }
+    }
+
+    if (state.screen === 'community') {
+      state.loadingLeaderboard = true;
+      render();
+      state.myCommunities = await getUserCommunities();
+      state.leaderboard = await getLeaderboard(state.activeCommunity);
+      state.loadingLeaderboard = false;
+      render();
+    }
   } else if (state.screen === 'community' || state.screen === 'auth-screen') {
     render();
   }
 });
+
+// Parse invite code from URL on boot
+const urlParams = new URLSearchParams(window.location.search);
+const inviteCode = urlParams.get('invite');
+if (inviteCode) {
+  localStorage.setItem('pilates_pending_invite', inviteCode);
+  // Optional: clear URL
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
 
 // Initial boot
 import { getProfile } from './utils/storage.js';
@@ -90,6 +114,10 @@ CapacitorApp.addListener('backButton', ({ canGoBack }) => {
       CapacitorApp.exitApp();
     }
   } else {
+    if (state.timerInterval) {
+      clearInterval(state.timerInterval);
+      state.timerInterval = null;
+    }
     state.screen = 'home';
     render();
   }
