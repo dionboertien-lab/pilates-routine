@@ -53,14 +53,14 @@ export function getWeekProgression(currentWeek, baseLevel = 1) {
   const effectiveLevel = Math.min(8, baseLevel + currentWeek - 1);
   
   const LEVELS = {
-    1: { id: 'l1', label: 'Beginner', mult: 0.6 },
-    2: { id: 'l2', label: 'Beginner+', mult: 0.8 },
+    1: { id: 'l1', label: 'Beginner', mult: 0.7 },
+    2: { id: 'l2', label: 'Beginner+', mult: 0.85 },
     3: { id: 'l3', label: 'Licht Gemiddeld', mult: 1.0 },
     4: { id: 'l4', label: 'Gemiddeld', mult: 1.2 },
-    5: { id: 'l5', label: 'Gemiddeld+', mult: 1.8 },
-    6: { id: 'l6', label: 'Gevorderd', mult: 2.5 },
-    7: { id: 'l7', label: 'Gevorderd+', mult: 3.0 },
-    8: { id: 'l8', label: 'Expert', mult: 4.0 },
+    5: { id: 'l5', label: 'Gemiddeld+', mult: 1.45 },
+    6: { id: 'l6', label: 'Gevorderd', mult: 1.75 },
+    7: { id: 'l7', label: 'Gevorderd+', mult: 2.1 },
+    8: { id: 'l8', label: 'Expert', mult: 2.5 },
   };
 
   return LEVELS[effectiveLevel] || LEVELS[1];
@@ -84,7 +84,8 @@ export function applyProgression(exercise, currentWeek, baseLevel = 1) {
       result.duration = exercise.maxDuration ? Math.min(scaledDuration, exercise.maxDuration) : scaledDuration;
     }
     if (result.type === 'combo') {
-      result.holdDuration = Math.max(5, Math.round((exercise.baseHoldDuration || 0) * multiplier));
+      const scaledHold = Math.max(5, Math.round((exercise.baseHoldDuration || 0) * multiplier));
+      result.holdDuration = Math.min(30, scaledHold); // Healthy cap at 30 seconds
     }
   }
 

@@ -168,8 +168,13 @@ export const translations = {
     'set.lvl.6': 'Gevorderd',
     'set.lvl.7': 'Gevorderd+',
     'set.lvl.8': 'Expert',
+
+    'side.been': 'been',
+    'side.kant': 'kant',
   },
   en: {
+    'side.been': 'leg',
+    'side.kant': 'side',
     // Shared
     'btn.back': '← Back',
     'btn.save': 'Save',

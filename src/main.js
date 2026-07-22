@@ -1,16 +1,18 @@
 import './style.css';
 import { state } from './state.js';
 import { render } from './ui/core.js';
-import { isOnboardingComplete } from './utils/storage.js';
+import { isOnboardingComplete, getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from './utils/storage.js';
 import { subscribeToAuth } from './utils/auth.js';
 import { getLeaderboard, getUserCommunities, initializeSocialUser, joinCommunity } from './utils/social.js';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 // Setup auth listener
 subscribeToAuth(async (user) => {
   state.currentUser = user;
   state.authLoading = false;
   if (user) {
-    await initializeSocialUser();
+    const profile = getProfile() || {};
+    await initializeSocialUser(profile, getTotalCompleted(), getCurrentWeek(), getMissedWorkouts());
     
     const pendingInvite = localStorage.getItem('pilates_pending_invite');
     if (pendingInvite) {
@@ -18,6 +20,8 @@ subscribeToAuth(async (user) => {
         await joinCommunity(pendingInvite);
         localStorage.removeItem('pilates_pending_invite');
         state.activeCommunity = pendingInvite;
+        const { showToast } = await import('./ui/core.js');
+        showToast(`Lid geworden van groep ${pendingInvite}!`, 'success');
       } catch (e) {
         console.warn('Could not join community from invite:', e);
       }
@@ -31,7 +35,7 @@ subscribeToAuth(async (user) => {
       state.loadingLeaderboard = false;
       render();
     }
-  } else if (state.screen === 'community' || state.screen === 'auth-screen') {
+  } else if (state.screen === 'community') {
     render();
   }
 });
@@ -46,8 +50,6 @@ if (inviteCode) {
 }
 
 // Initial boot
-import { getProfile } from './utils/storage.js';
-import { StatusBar, Style } from '@capacitor/status-bar';
 
 export async function applyTheme() {
   const profile = getProfile();

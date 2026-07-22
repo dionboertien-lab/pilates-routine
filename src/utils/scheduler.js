@@ -28,15 +28,21 @@ export const GOAL_INFO = {
 
 function getActiveGoals(profile) {
   if (!profile) return ['alles'];
-  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
-  
-  const goals = [];
-  if (baseLevels.core > 0) goals.push('core');
-  if (baseLevels['benen-billen'] > 0) goals.push('billen-benen');
-  if (baseLevels['rug-houding'] > 0) goals.push('rug');
 
-  if (goals.length === 3 || goals.length === 0) return ['alles'];
-  return goals;
+  if (Array.isArray(profile.goals) && profile.goals.includes('alles')) {
+    return ['alles'];
+  }
+
+  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
+  const userGoals = Array.isArray(profile.goals) && profile.goals.length > 0 ? profile.goals : ['billen-benen', 'core', 'rug'];
+
+  const activeGoals = [];
+  if (userGoals.includes('core') && baseLevels.core !== 0) activeGoals.push('core');
+  if ((userGoals.includes('billen-benen') || userGoals.includes('benen-billen')) && baseLevels['benen-billen'] !== 0) activeGoals.push('billen-benen');
+  if (userGoals.includes('rug') && baseLevels['rug-houding'] !== 0) activeGoals.push('rug');
+
+  if (activeGoals.length === 3 || activeGoals.length === 0) return ['alles'];
+  return activeGoals;
 }
 
 /**

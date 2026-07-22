@@ -32,6 +32,7 @@ const DEFAULT_PROFILE = {
   },
   includeStretch: true,
   onboardingComplete: false,
+  schemaVersion: 1,
 };
 
 /**
@@ -74,7 +75,11 @@ export function getProfile() {
  * Save the user profile.
  */
 export function saveProfile(profile) {
-  localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+  try {
+    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+  } catch (e) {
+    console.error('Failed to save profile to localStorage', e);
+  }
 }
 
 /**
@@ -99,8 +104,15 @@ export function getUserName() {
 export function getProgramStartDate() {
   const profile = getProfile();
   if (profile && profile.startDate) {
-    const [year, month, day] = profile.startDate.split('-');
-    return new Date(year, month - 1, day);
+    const parts = profile.startDate.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        return new Date(year, month - 1, day);
+      }
+    }
   }
   return null;
 }
@@ -124,22 +136,25 @@ export function setStartDate(dateStr) {
  * Get all completed days as a Map of "YYYY-MM-DD" → focus type emoji.
  */
 export function getCompletedDays() {
-  const stored = localStorage.getItem(STORAGE_KEYS.COMPLETED_DAYS);
-  if (stored) {
-    let parsed;
-    try {
-      parsed = JSON.parse(stored);
-    } catch (e) {
-      console.error('Failed to parse completed days', e);
-      return {};
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.COMPLETED_DAYS);
+    if (stored) {
+      let parsed;
+      try {
+        parsed = JSON.parse(stored);
+      } catch (e) {
+        console.error('Failed to parse completed days', e);
+        return {};
+      }
+      if (Array.isArray(parsed)) {
+        const map = {};
+        parsed.forEach(d => { map[d] = '✓'; });
+        return map;
+      }
+      return parsed && typeof parsed === 'object' ? parsed : {};
     }
-    // Support both old format (array of strings) and new (object with focus)
-    if (Array.isArray(parsed)) {
-      const map = {};
-      parsed.forEach(d => { map[d] = '✓'; });
-      return map;
-    }
-    return parsed;
+  } catch (e) {
+    console.error('Error reading completed days from localStorage', e);
   }
   return {};
 }
@@ -148,10 +163,14 @@ export function getCompletedDays() {
  * Mark today as completed with the given focus type.
  */
 export function markTodayComplete(focusEmoji = '✓') {
-  const days = getCompletedDays();
-  const today = formatDate(new Date());
-  days[today] = focusEmoji;
-  localStorage.setItem(STORAGE_KEYS.COMPLETED_DAYS, JSON.stringify(days));
+  try {
+    const days = getCompletedDays();
+    const today = formatDate(new Date());
+    days[today] = focusEmoji;
+    localStorage.setItem(STORAGE_KEYS.COMPLETED_DAYS, JSON.stringify(days));
+  } catch (e) {
+    console.error('Failed to save completed day to localStorage', e);
+  }
 }
 
 /**
@@ -194,9 +213,9 @@ export function getTotalCompleted() {
  */
 export function getMissedWorkouts() {
   const profile = getProfile();
-  if (!profile || !profile.startDate) return 0;
+  const start = getProgramStartDate();
+  if (!profile || !start) return 0;
 
-  const start = new Date(profile.startDate);
   start.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
