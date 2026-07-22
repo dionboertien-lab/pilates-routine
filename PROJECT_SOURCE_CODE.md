@@ -59,13 +59,18 @@ service cloud.firestore {
     
     match /communities/{communityId} {
       allow read: if request.auth != null;
-      // Ensure ownerId is the creator and name is validated (XR.2)
+      // Ensure ownerId is the creator and name is validated
       allow create: if request.auth != null 
                     && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 50;
       allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+
+      match /members/{memberUid} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == memberUid;
+      }
     }
   }
 }
@@ -74,10 +79,7 @@ service cloud.firestore {
 
 ## Bestand: eslint.config.js
 ```js
-import js from '@eslint/js';
-
 export default [
-  js.configs.recommended,
   {
     languageOptions: {
       ecmaVersion: 2022,
@@ -97,7 +99,8 @@ export default [
         FileReader: 'readonly',
         HTMLVideoElement: 'readonly',
         HTMLCanvasElement: 'readonly',
-        URLSearchParams: 'readonly'
+        URLSearchParams: 'readonly',
+        File: 'readonly'
       }
     },
     rules: {
@@ -330,6 +333,13 @@ export const state = {
 
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-accent: var(--font-display);
+
+  --surface: var(--bg-card);
+  --text-main: var(--text-primary);
+  --charcoal: var(--text-primary);
+  --border-color: rgba(139, 158, 124, 0.14);
+  --transition-bounce: 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --space-xs: 4px;
   --space-sm: 8px;
@@ -2820,21 +2830,25 @@ export const SECTIONS = [
   },
 ];
 
+const PROGRESSION_BY_WEEK = [1.00, 1.05, 1.10, 1.10, 1.15, 1.20, 1.20, 1.25];
+
 export function getWeekProgression(currentWeek, baseLevel = 1) {
-  const effectiveLevel = Math.min(8, baseLevel + currentWeek - 1);
+  const weekIndex = Math.min(Math.max((currentWeek || 1) - 1, 0), PROGRESSION_BY_WEEK.length - 1);
+  const mult = PROGRESSION_BY_WEEK[weekIndex];
   
   const LEVELS = {
-    1: { id: 'l1', label: 'Beginner', mult: 0.7 },
-    2: { id: 'l2', label: 'Beginner+', mult: 0.85 },
-    3: { id: 'l3', label: 'Licht Gemiddeld', mult: 1.0 },
-    4: { id: 'l4', label: 'Gemiddeld', mult: 1.2 },
-    5: { id: 'l5', label: 'Gemiddeld+', mult: 1.45 },
-    6: { id: 'l6', label: 'Gevorderd', mult: 1.75 },
-    7: { id: 'l7', label: 'Gevorderd+', mult: 2.1 },
-    8: { id: 'l8', label: 'Expert', mult: 2.5 },
+    1: { id: 'l1', label: 'Beginner' },
+    2: { id: 'l2', label: 'Beginner+' },
+    3: { id: 'l3', label: 'Licht Gemiddeld' },
+    4: { id: 'l4', label: 'Gemiddeld' },
+    5: { id: 'l5', label: 'Gemiddeld+' },
+    6: { id: 'l6', label: 'Gevorderd' },
+    7: { id: 'l7', label: 'Gevorderd+' },
+    8: { id: 'l8', label: 'Expert' },
   };
 
-  return LEVELS[effectiveLevel] || LEVELS[1];
+  const levelInfo = LEVELS[Math.min(8, Math.max(1, baseLevel))] || LEVELS[1];
+  return { ...levelInfo, mult };
 }
 
 export function applyProgression(exercise, currentWeek, baseLevel = 1) {
@@ -3166,6 +3180,13 @@ export function getSection(sectionId) {
   return SECTIONS.find(s => s.id === sectionId);
 }
 
+export function matchesTargetGender(exercise, gender = 'female') {
+  if (!exercise || !exercise.targetGender || exercise.targetGender === 'all') return true;
+  if (gender === 'male') return exercise.targetGender === 'male';
+  if (gender === 'female') return exercise.targetGender === 'female';
+  return exercise.targetGender === 'all';
+}
+
 /**
  * Build the workout steps based on goals, current week, baseLevels object, and gender.
  */
@@ -3173,8 +3194,7 @@ export function buildWorkoutSteps(sectionIds, currentWeek, gender = 'female', ba
   const steps = [];
 
   const filteredExercises = EXERCISES.filter(e => {
-    // Check section
-    return sectionIds.includes(e.sectionId);
+    return sectionIds.includes(e.sectionId) && matchesTargetGender(e, gender);
   });
 
   for (const exercise of filteredExercises) {
@@ -3278,7 +3298,7 @@ const STORAGE_KEYS = {
 
 let mlcEngine = null;
 let currentEngineModelId = null;
-let isInitializing = false;
+let initializationPromise = null;
 
 export function getAIProvider() {
   return localStorage.getItem(STORAGE_KEYS.PROVIDER) || 'cloud';
@@ -3324,43 +3344,41 @@ export async function checkWebGPUSupport() {
 
 export async function initLocalEngine(modelId = null, onProgress = null) {
   const selectedModel = modelId || getSelectedLocalModelId();
-  
   if (mlcEngine && currentEngineModelId === selectedModel) {
     return mlcEngine;
   }
 
-  if (isInitializing) {
-    throw new Error('Er is al een model bezig met initialiseren of downloaden...');
+  if (initializationPromise) {
+    return initializationPromise;
   }
 
-  const gpuCheck = await checkWebGPUSupport();
-  if (!gpuCheck.supported) {
-    throw new Error(gpuCheck.reason);
-  }
-
-  isInitializing = true;
-
-  try {
+  initializationPromise = (async () => {
+    const gpuCheck = await checkWebGPUSupport();
+    if (!gpuCheck.supported) {
+      throw new Error(gpuCheck.reason);
+    }
     const engine = await CreateMLCEngine(selectedModel, {
       initProgressCallback: (progress) => {
         if (onProgress) {
-          // progress contains: { text: string, progress: number }
           const text = progress.text || 'Laden...';
           const pct = Math.round((progress.progress || 0) * 100);
           onProgress(text, pct);
         }
       }
     });
-
     mlcEngine = engine;
     currentEngineModelId = selectedModel;
-    isInitializing = false;
-    return mlcEngine;
+    return engine;
+  })();
+
+  try {
+    return await initializationPromise;
   } catch (err) {
-    isInitializing = false;
     mlcEngine = null;
     currentEngineModelId = null;
     throw new Error(`Fout bij laden van lokaal model (${selectedModel}): ${err.message}`);
+  } finally {
+    initializationPromise = null;
   }
 }
 
@@ -3510,14 +3528,37 @@ export async function extractImageBase64(imageFile) {
   });
 }
 
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
+
+export function validateFormCheckFile(file) {
+  if (!(file instanceof File)) {
+    throw new Error('Geen geldig bestand geselecteerd.');
+  }
+
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+
+  if (!isImage && !isVideo) {
+    throw new Error('Selecteer een afbeelding of een videobestand.');
+  }
+
+  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (file.size > maxBytes) {
+    const maxMb = Math.round(maxBytes / (1024 * 1024));
+    throw new Error(`Het bestand mag maximaal ${maxMb} MB zijn.`);
+  }
+
+  return { isImage, isVideo };
+}
+
 export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening', onProgress = null }) {
   if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
     throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie voor video-analyse.');
   }
 
+  const { isImage, isVideo } = validateFormCheckFile(file);
   let frames = [];
-  const isVideo = file.type.startsWith('video/');
-  const isImage = file.type.startsWith('image/');
 
   if (isVideo) {
     if (onProgress) onProgress('Video keyframes verwerken...', 30);
@@ -3526,20 +3567,26 @@ export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening'
     if (onProgress) onProgress('Afbeelding verwerken...', 50);
     const b64 = await extractImageBase64(file);
     frames = [b64];
-  } else {
-    throw new Error('Alleen videobestanden en afbeeldingen worden ondersteund voor Form Check.');
   }
 
   if (onProgress) onProgress('Anatomische analyse uitvoeren via Kiné Gemini Multimodal Cloud...', 70);
 
-  const promptText = `Je bent Kiné Coach, een expert in Pilates, anatomie en biomechanica. Analyseer de geüploade beelden van de oefening ("${exerciseName}"). 
-Geef een professionele, opbouwende en accurate anatomische beoordeling in het Nederlands met de volgende opbouw:
+  const FORM_CHECK_SYSTEM_INSTRUCTION = `Je geeft uitsluitend algemene, educatieve bewegings- en houdingsfeedback.
+Belangrijke beperkingen:
+- Stel geen medische diagnose.
+- Beoordeel geen blessures, pijnklachten of medische aandoeningen.
+- Doe geen uitspraken alsof stilstaande beelden volledige zekerheid bieden.
+- Benoem onzekerheid wanneer camerahoek of kleding de beoordeling beperkt.
+- Adviseer te stoppen bij pijn of duizeligheid en verwijs bij klachten naar een bevoegde arts of fysiotherapeut.
+- Gebruik neutrale termen zoals "mogelijk zichtbaar" en "op basis van deze beelden".`;
 
-🧘 **Houding & Uitlijning**: Wat gaat er goed aan de positie en vorm?
-⚠️ **Aandachtspunten**: Waar zit compensatie (bijv. bekken, schouders, wervelkolom, nekhouding)?
-💡 **3 Kiné Tips**: Geef 3 concrete tips/correcties om de vorm te perfectioneren.
+  const promptText = `${FORM_CHECK_SYSTEM_INSTRUCTION}
 
-Houd de antwoorden helder, aanmoedigend en professioneel.`;
+Analyseer de geüploade beelden van de oefening ("${exerciseName}"). Geef een heldere en educatieve beoordeling in het Nederlands met de volgende opbouw:
+
+🧘 **Mogelijk Zichtbare Uitlijning**: Wat valt op aan de positie op basis van deze beelden?
+⚠️ **Aandachtspunten**: Waar zit mogelijke compensatie (bijv. bekken, schouders, wervelkolom)?
+💡 **3 Bewegingstips**: Geef 3 algemene tips om de controle te verbeteren.`;
 
   const inlineParts = frames.map(f => ({
     inlineData: {
@@ -4104,9 +4151,8 @@ function getWorkoutDayIndex() {
 import { db } from './firebase.js';
 import { getCurrentUser } from './auth.js';
 import { 
-  doc, setDoc, getDoc, getDocs, deleteDoc,
-  collection, query, orderBy, where, 
-  arrayUnion, serverTimestamp 
+  doc, setDoc, getDoc, getDocs, deleteDoc, 
+  collection, arrayUnion, serverTimestamp 
 } from 'firebase/firestore';
 
 /**
@@ -4177,26 +4223,32 @@ export async function pushUserProgress(data) {
   if (!user) return; // Only push if authenticated
 
   try {
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    let remoteTotal = 0;
-    if (userSnap.exists()) {
-      remoteTotal = userSnap.data().totalWorkouts || 0;
-    }
-    
     const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
 
+    const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, {
       name: displayName || 'Pilates Fan',
-      totalWorkouts: Math.max(remoteTotal, data.totalWorkouts || 0),
+      totalWorkouts: data.totalWorkouts || 0,
       currentWeek: data.currentWeek || 1,
       missedWorkouts: data.missedWorkouts || 0,
       lastActive: serverTimestamp()
     }, { merge: true });
-    
+
+    // Sync to community members for public leaderboard
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      await setDoc(memberRef, {
+        displayName: displayName || 'Pilates Fan',
+        score: data.totalWorkouts || 0,
+        currentWeek: data.currentWeek || 1,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+    }
   } catch (error) {
     console.error("Error pushing progress:", error);
-    import('../ui/core.js').then(module => module.showToast('Voortgang niet lokaal gesynchroniseerd.', 'error'));
   }
 }
 
@@ -4219,17 +4271,12 @@ export async function resetCloudProgress() {
  */
 export async function getLeaderboard(communityCode = 'global') {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(
-      usersRef, 
-      where('communities', 'array-contains', communityCode)
-    );
-    const querySnapshot = await getDocs(q);
+    const membersRef = collection(db, 'communities', communityCode, 'members');
+    const querySnapshot = await getDocs(membersRef);
     
     const leaderboard = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      // Handle timestamp conversion safely
       let lastActiveStr = 'Onbekend';
       if (data.lastActive && data.lastActive.toDate) {
         lastActiveStr = data.lastActive.toDate().toLocaleDateString();
@@ -4239,21 +4286,18 @@ export async function getLeaderboard(communityCode = 'global') {
 
       leaderboard.push({
         id: doc.id,
-        name: data.name || 'Pilates Fan',
-        totalWorkouts: data.totalWorkouts || 0,
-        missedWorkouts: data.missedWorkouts || 0,
+        name: data.displayName || 'Pilates Fan',
+        totalWorkouts: data.score || 0,
+        missedWorkouts: 0,
         currentWeek: data.currentWeek || 1,
         lastActive: lastActiveStr
       });
     });
     
-    // Sort locally by totalWorkouts descending to avoid Firebase composite index requirement
     leaderboard.sort((a, b) => b.totalWorkouts - a.totalWorkouts);
-
     return leaderboard;
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
-    import('../ui/core.js').then(module => module.showToast('Kan leaderboard niet laden. Ben je offline?', 'error'));
     return [];
   }
 }
@@ -4937,7 +4981,32 @@ import { renderCoach } from './screens/coachScreen.js';
 
 export const app = document.getElementById('app');
 
+const screenCleanups = new Map();
+let activeScreen = null;
+
+export function registerScreenCleanup(screen, cleanup) {
+  screenCleanups.set(screen, cleanup);
+}
+
+export function cleanupScreen(screen) {
+  const cleanup = screenCleanups.get(screen);
+  if (cleanup) {
+    try {
+      cleanup();
+    } catch (e) {
+      console.warn('Error during screen cleanup:', e);
+    } finally {
+      screenCleanups.delete(screen);
+    }
+  }
+}
+
 export function render() {
+  if (activeScreen && activeScreen !== state.screen) {
+    cleanupScreen(activeScreen);
+  }
+  activeScreen = state.screen;
+
   const doRender = () => {
     switch (state.screen) {
       case 'onboarding': renderOnboarding(); break;
@@ -5027,6 +5096,8 @@ export function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast toast--${type}`;
   toast.innerText = message;
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
   document.body.appendChild(toast);
   
   // Force reflow for transition
@@ -5081,9 +5152,12 @@ export function getBottomNavHTML(activeTab) {
   ];
 
   return `
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" aria-label="Hoofdnavigatie">
       ${tabs.map(tab => `
-        <button class="bottom-nav__item ${activeTab === tab.id ? 'bottom-nav__item--active' : ''}" data-nav-target="${tab.id}">
+        <button class="bottom-nav__item ${activeTab === tab.id ? 'bottom-nav__item--active' : ''}" 
+                data-nav-target="${tab.id}" 
+                aria-label="${tab.label}"
+                ${activeTab === tab.id ? 'aria-current="page"' : ''}>
           <div class="bottom-nav__icon">${tab.icon}</div>
           <span class="bottom-nav__label">${tab.label}</span>
         </button>
@@ -5110,8 +5184,7 @@ import { state } from '../../state.js';
 import { app, render, escapeHTML, showDialog } from '../core.js';
 import { getProfile, getUserName, isTodayComplete, getTotalCompleted, getCurrentWeek, getProgramStartDate, buildCalendarData, resetProgress } from '../../utils/storage.js';
 import { getTodaysFocus, getGoalSubtitle } from '../../utils/scheduler.js';
-import { getWeekProgression, buildWorkoutSteps } from '../../data/exercises.js';
-import { loadCommunitiesAndLeaderboard } from './communityScreen.js';
+import { getWeekProgression } from '../../data/exercises.js';
 import { t } from '../../utils/i18n.js';
 import confetti from 'canvas-confetti';
 import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
@@ -5783,6 +5856,27 @@ function handleSkip() {
   nextStep();
 }
 
+export function getWorkoutCompletionResult() {
+  const steps = state.workoutSteps || [];
+  const relevantSteps = steps.filter(s => s.sectionId !== 'warmup' && s.sectionId !== 'stretch');
+  
+  if (relevantSteps.length === 0) {
+    return { accepted: false, reason: 'Deze workout bevat geen kernonderdelen.' };
+  }
+
+  const skipped = state.skippedCoreCount || 0;
+  const completed = relevantSteps.length - skipped;
+  const required = Math.ceil(relevantSteps.length / 2);
+
+  return {
+    accepted: completed >= required,
+    relevantSteps: relevantSteps.length,
+    skipped,
+    completed,
+    required
+  };
+}
+
 function nextStep() {
   clearTimerInterval();
 
@@ -5791,6 +5885,8 @@ function nextStep() {
   const nextIndex = state.currentStepIndex + 1;
 
   if (nextIndex >= steps.length) {
+    const result = getWorkoutCompletionResult();
+
     if (state.trackerInterval) {
       clearInterval(state.trackerInterval);
       state.trackerInterval = null;
@@ -5799,6 +5895,17 @@ function nextStep() {
     if (state.bluetoothDeviceId) {
       disconnectHeartRateMonitor(state.bluetoothDeviceId);
       state.bluetoothDeviceId = null;
+    }
+
+    if (!result.accepted) {
+      showDialog(
+        t('wk.notCompleted.title'),
+        t('wk.notCompleted.msg'),
+        t('btn.confirm'),
+        null,
+        () => { state.screen = 'home'; render(); }
+      );
+      return;
     }
 
     const focus = state.todayFocus;
@@ -5842,7 +5949,8 @@ function handleQuit() {
   showDialog(
     t('dlg.quit.title'),
     t('dlg.quit.msg'),
-    t('dlg.quit.confirm'), t('dlg.quit.cancel'),
+    t('dlg.quit.cancel'), // Primary action button: "Stoppen" / "Quit"
+    t('dlg.quit.confirm'), // Secondary button: "Doorgaan" / "Continue Workout"
     () => { 
       clearTimerInterval(); 
       if (state.trackerInterval) clearInterval(state.trackerInterval);
@@ -5857,7 +5965,7 @@ function handleQuit() {
 
 ## Bestand: src/ui/screens/coachScreen.js
 ```js
-import { app, showToast, showDialog, escapeHTML } from '../core.js';
+import { app, showToast, showDialog, escapeHTML, registerScreenCleanup } from '../core.js';
 import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
 import { db } from '../../utils/firebase.js';
 import { getCurrentUser } from '../../utils/auth.js';
@@ -6228,6 +6336,13 @@ export function renderCoach() {
   const sendBtn = document.getElementById('coach-send');
   const input = document.getElementById('coach-input');
 
+  registerScreenCleanup('coach', () => {
+    if (unsubscribeChat) {
+      unsubscribeChat();
+      unsubscribeChat = null;
+    }
+  });
+
   const sendMessage = async () => {
     const text = input.value.trim();
     if (!text) return;
@@ -6235,13 +6350,8 @@ export function renderCoach() {
     input.value = '';
 
     try {
-      await addDoc(chatRef, {
-        role: 'user',
-        text: text,
-        createdAt: serverTimestamp()
-      });
-
-      const qContext = query(chatRef, orderBy('createdAt', 'desc'), limit(5));
+      // Fetch previous chat history BEFORE adding current prompt to avoid prompt duplication in context
+      const qContext = query(chatRef, orderBy('createdAt', 'desc'), limit(6));
       const contextSnap = await getDocs(qContext);
       const history = [];
       contextSnap.forEach(doc => {
@@ -6250,6 +6360,12 @@ export function renderCoach() {
           role: d.role === 'user' ? 'user' : 'model',
           parts: [{ text: d.text }]
         });
+      });
+
+      await addDoc(chatRef, {
+        role: 'user',
+        text: text,
+        createdAt: serverTimestamp()
       });
 
       const chatContainer = document.getElementById('coach-chat-container');
@@ -6527,8 +6643,7 @@ function renderCommunity() {
 ```js
 import { state } from '../../state.js';
 import { app, render } from '../core.js';
-import { getUserName, getTotalCompleted, getCurrentWeek, getProfile, getMissedWorkouts } from '../../utils/storage.js';
-import { pushUserProgress } from '../../utils/social.js';
+import { getUserName, getTotalCompleted, getCurrentWeek } from '../../utils/storage.js';
 import { loadCommunitiesAndLeaderboard } from './communityScreen.js';
 import { t } from '../../utils/i18n.js';
 
@@ -6622,7 +6737,7 @@ export function renderOnboarding() {
     </div>
   `;
 
-  attachOnboardingListeners(step);
+  attachOnboardingListeners(step, steps.length);
 }
 
 function renderStep0() {
@@ -6748,7 +6863,7 @@ function canProceed(step, data) {
   return true;
 }
 
-function attachOnboardingListeners(step) {
+function attachOnboardingListeners(step, totalSteps = 5) {
   const prevBtn = document.getElementById('ob-prev');
   const nextBtn = document.getElementById('ob-next');
 
@@ -6763,7 +6878,7 @@ function attachOnboardingListeners(step) {
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
       saveStepData(step);
-      if (step === steps.length - 1) {
+      if (step === totalSteps - 1) {
         completeOnboarding();
       } else {
         state.onboardingStep++;

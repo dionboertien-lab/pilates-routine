@@ -1,7 +1,6 @@
 import { state } from '../../state.js';
 import { app, render } from '../core.js';
-import { getUserName, getTotalCompleted, getCurrentWeek, getProfile, getMissedWorkouts } from '../../utils/storage.js';
-import { pushUserProgress } from '../../utils/social.js';
+import { getUserName, getTotalCompleted, getCurrentWeek } from '../../utils/storage.js';
 import { loadCommunitiesAndLeaderboard } from './communityScreen.js';
 import { t } from '../../utils/i18n.js';
 

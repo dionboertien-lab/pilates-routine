@@ -62,7 +62,7 @@ const STORAGE_KEYS = {
 
 let mlcEngine = null;
 let currentEngineModelId = null;
-let isInitializing = false;
+let initializationPromise = null;
 
 export function getAIProvider() {
   return localStorage.getItem(STORAGE_KEYS.PROVIDER) || 'cloud';
@@ -108,43 +108,41 @@ export async function checkWebGPUSupport() {
 
 export async function initLocalEngine(modelId = null, onProgress = null) {
   const selectedModel = modelId || getSelectedLocalModelId();
-  
   if (mlcEngine && currentEngineModelId === selectedModel) {
     return mlcEngine;
   }
 
-  if (isInitializing) {
-    throw new Error('Er is al een model bezig met initialiseren of downloaden...');
+  if (initializationPromise) {
+    return initializationPromise;
   }
 
-  const gpuCheck = await checkWebGPUSupport();
-  if (!gpuCheck.supported) {
-    throw new Error(gpuCheck.reason);
-  }
-
-  isInitializing = true;
-
-  try {
+  initializationPromise = (async () => {
+    const gpuCheck = await checkWebGPUSupport();
+    if (!gpuCheck.supported) {
+      throw new Error(gpuCheck.reason);
+    }
     const engine = await CreateMLCEngine(selectedModel, {
       initProgressCallback: (progress) => {
         if (onProgress) {
-          // progress contains: { text: string, progress: number }
           const text = progress.text || 'Laden...';
           const pct = Math.round((progress.progress || 0) * 100);
           onProgress(text, pct);
         }
       }
     });
-
     mlcEngine = engine;
     currentEngineModelId = selectedModel;
-    isInitializing = false;
-    return mlcEngine;
+    return engine;
+  })();
+
+  try {
+    return await initializationPromise;
   } catch (err) {
-    isInitializing = false;
     mlcEngine = null;
     currentEngineModelId = null;
     throw new Error(`Fout bij laden van lokaal model (${selectedModel}): ${err.message}`);
+  } finally {
+    initializationPromise = null;
   }
 }
 
@@ -294,14 +292,37 @@ export async function extractImageBase64(imageFile) {
   });
 }
 
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
+
+export function validateFormCheckFile(file) {
+  if (!(file instanceof File)) {
+    throw new Error('Geen geldig bestand geselecteerd.');
+  }
+
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+
+  if (!isImage && !isVideo) {
+    throw new Error('Selecteer een afbeelding of een videobestand.');
+  }
+
+  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (file.size > maxBytes) {
+    const maxMb = Math.round(maxBytes / (1024 * 1024));
+    throw new Error(`Het bestand mag maximaal ${maxMb} MB zijn.`);
+  }
+
+  return { isImage, isVideo };
+}
+
 export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening', onProgress = null }) {
   if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
     throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie voor video-analyse.');
   }
 
+  const { isImage, isVideo } = validateFormCheckFile(file);
   let frames = [];
-  const isVideo = file.type.startsWith('video/');
-  const isImage = file.type.startsWith('image/');
 
   if (isVideo) {
     if (onProgress) onProgress('Video keyframes verwerken...', 30);
@@ -310,20 +331,26 @@ export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening'
     if (onProgress) onProgress('Afbeelding verwerken...', 50);
     const b64 = await extractImageBase64(file);
     frames = [b64];
-  } else {
-    throw new Error('Alleen videobestanden en afbeeldingen worden ondersteund voor Form Check.');
   }
 
   if (onProgress) onProgress('Anatomische analyse uitvoeren via Kiné Gemini Multimodal Cloud...', 70);
 
-  const promptText = `Je bent Kiné Coach, een expert in Pilates, anatomie en biomechanica. Analyseer de geüploade beelden van de oefening ("${exerciseName}"). 
-Geef een professionele, opbouwende en accurate anatomische beoordeling in het Nederlands met de volgende opbouw:
+  const FORM_CHECK_SYSTEM_INSTRUCTION = `Je geeft uitsluitend algemene, educatieve bewegings- en houdingsfeedback.
+Belangrijke beperkingen:
+- Stel geen medische diagnose.
+- Beoordeel geen blessures, pijnklachten of medische aandoeningen.
+- Doe geen uitspraken alsof stilstaande beelden volledige zekerheid bieden.
+- Benoem onzekerheid wanneer camerahoek of kleding de beoordeling beperkt.
+- Adviseer te stoppen bij pijn of duizeligheid en verwijs bij klachten naar een bevoegde arts of fysiotherapeut.
+- Gebruik neutrale termen zoals "mogelijk zichtbaar" en "op basis van deze beelden".`;
 
-🧘 **Houding & Uitlijning**: Wat gaat er goed aan de positie en vorm?
-⚠️ **Aandachtspunten**: Waar zit compensatie (bijv. bekken, schouders, wervelkolom, nekhouding)?
-💡 **3 Kiné Tips**: Geef 3 concrete tips/correcties om de vorm te perfectioneren.
+  const promptText = `${FORM_CHECK_SYSTEM_INSTRUCTION}
 
-Houd de antwoorden helder, aanmoedigend en professioneel.`;
+Analyseer de geüploade beelden van de oefening ("${exerciseName}"). Geef een heldere en educatieve beoordeling in het Nederlands met de volgende opbouw:
+
+🧘 **Mogelijk Zichtbare Uitlijning**: Wat valt op aan de positie op basis van deze beelden?
+⚠️ **Aandachtspunten**: Waar zit mogelijke compensatie (bijv. bekken, schouders, wervelkolom)?
+💡 **3 Bewegingstips**: Geef 3 algemene tips om de controle te verbeteren.`;
 
   const inlineParts = frames.map(f => ({
     inlineData: {

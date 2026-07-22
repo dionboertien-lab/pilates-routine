@@ -9,7 +9,32 @@ import { renderCoach } from './screens/coachScreen.js';
 
 export const app = document.getElementById('app');
 
+const screenCleanups = new Map();
+let activeScreen = null;
+
+export function registerScreenCleanup(screen, cleanup) {
+  screenCleanups.set(screen, cleanup);
+}
+
+export function cleanupScreen(screen) {
+  const cleanup = screenCleanups.get(screen);
+  if (cleanup) {
+    try {
+      cleanup();
+    } catch (e) {
+      console.warn('Error during screen cleanup:', e);
+    } finally {
+      screenCleanups.delete(screen);
+    }
+  }
+}
+
 export function render() {
+  if (activeScreen && activeScreen !== state.screen) {
+    cleanupScreen(activeScreen);
+  }
+  activeScreen = state.screen;
+
   const doRender = () => {
     switch (state.screen) {
       case 'onboarding': renderOnboarding(); break;
@@ -99,6 +124,8 @@ export function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast toast--${type}`;
   toast.innerText = message;
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
   document.body.appendChild(toast);
   
   // Force reflow for transition

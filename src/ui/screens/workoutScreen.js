@@ -457,6 +457,27 @@ function handleSkip() {
   nextStep();
 }
 
+export function getWorkoutCompletionResult() {
+  const steps = state.workoutSteps || [];
+  const relevantSteps = steps.filter(s => s.sectionId !== 'warmup' && s.sectionId !== 'stretch');
+  
+  if (relevantSteps.length === 0) {
+    return { accepted: false, reason: 'Deze workout bevat geen kernonderdelen.' };
+  }
+
+  const skipped = state.skippedCoreCount || 0;
+  const completed = relevantSteps.length - skipped;
+  const required = Math.ceil(relevantSteps.length / 2);
+
+  return {
+    accepted: completed >= required,
+    relevantSteps: relevantSteps.length,
+    skipped,
+    completed,
+    required
+  };
+}
+
 function nextStep() {
   clearTimerInterval();
 
@@ -465,6 +486,8 @@ function nextStep() {
   const nextIndex = state.currentStepIndex + 1;
 
   if (nextIndex >= steps.length) {
+    const result = getWorkoutCompletionResult();
+
     if (state.trackerInterval) {
       clearInterval(state.trackerInterval);
       state.trackerInterval = null;
@@ -473,6 +496,17 @@ function nextStep() {
     if (state.bluetoothDeviceId) {
       disconnectHeartRateMonitor(state.bluetoothDeviceId);
       state.bluetoothDeviceId = null;
+    }
+
+    if (!result.accepted) {
+      showDialog(
+        t('wk.notCompleted.title'),
+        t('wk.notCompleted.msg'),
+        t('btn.confirm'),
+        null,
+        () => { state.screen = 'home'; render(); }
+      );
+      return;
     }
 
     const focus = state.todayFocus;
@@ -516,7 +550,8 @@ function handleQuit() {
   showDialog(
     t('dlg.quit.title'),
     t('dlg.quit.msg'),
-    t('dlg.quit.confirm'), t('dlg.quit.cancel'),
+    t('dlg.quit.cancel'), // Primary action button: "Stoppen" / "Quit"
+    t('dlg.quit.confirm'), // Secondary button: "Doorgaan" / "Continue Workout"
     () => { 
       clearTimerInterval(); 
       if (state.trackerInterval) clearInterval(state.trackerInterval);

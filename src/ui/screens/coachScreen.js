@@ -1,4 +1,4 @@
-import { app, showToast, showDialog, escapeHTML } from '../core.js';
+import { app, showToast, showDialog, escapeHTML, registerScreenCleanup } from '../core.js';
 import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
 import { db } from '../../utils/firebase.js';
 import { getCurrentUser } from '../../utils/auth.js';
@@ -369,6 +369,13 @@ export function renderCoach() {
   const sendBtn = document.getElementById('coach-send');
   const input = document.getElementById('coach-input');
 
+  registerScreenCleanup('coach', () => {
+    if (unsubscribeChat) {
+      unsubscribeChat();
+      unsubscribeChat = null;
+    }
+  });
+
   const sendMessage = async () => {
     const text = input.value.trim();
     if (!text) return;
@@ -376,13 +383,8 @@ export function renderCoach() {
     input.value = '';
 
     try {
-      await addDoc(chatRef, {
-        role: 'user',
-        text: text,
-        createdAt: serverTimestamp()
-      });
-
-      const qContext = query(chatRef, orderBy('createdAt', 'desc'), limit(5));
+      // Fetch previous chat history BEFORE adding current prompt to avoid prompt duplication in context
+      const qContext = query(chatRef, orderBy('createdAt', 'desc'), limit(6));
       const contextSnap = await getDocs(qContext);
       const history = [];
       contextSnap.forEach(doc => {
@@ -391,6 +393,12 @@ export function renderCoach() {
           role: d.role === 'user' ? 'user' : 'model',
           parts: [{ text: d.text }]
         });
+      });
+
+      await addDoc(chatRef, {
+        role: 'user',
+        text: text,
+        createdAt: serverTimestamp()
       });
 
       const chatContainer = document.getElementById('coach-chat-container');

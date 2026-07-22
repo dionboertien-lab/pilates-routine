@@ -1,9 +1,8 @@
 import { db } from './firebase.js';
 import { getCurrentUser } from './auth.js';
 import { 
-  doc, setDoc, getDoc, getDocs, deleteDoc,
-  collection, query, orderBy, where, 
-  arrayUnion, serverTimestamp 
+  doc, setDoc, getDoc, getDocs, deleteDoc, 
+  collection, arrayUnion, serverTimestamp 
 } from 'firebase/firestore';
 
 /**
@@ -74,26 +73,32 @@ export async function pushUserProgress(data) {
   if (!user) return; // Only push if authenticated
 
   try {
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    let remoteTotal = 0;
-    if (userSnap.exists()) {
-      remoteTotal = userSnap.data().totalWorkouts || 0;
-    }
-    
     const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
 
+    const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, {
       name: displayName || 'Pilates Fan',
-      totalWorkouts: Math.max(remoteTotal, data.totalWorkouts || 0),
+      totalWorkouts: data.totalWorkouts || 0,
       currentWeek: data.currentWeek || 1,
       missedWorkouts: data.missedWorkouts || 0,
       lastActive: serverTimestamp()
     }, { merge: true });
-    
+
+    // Sync to community members for public leaderboard
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      await setDoc(memberRef, {
+        displayName: displayName || 'Pilates Fan',
+        score: data.totalWorkouts || 0,
+        currentWeek: data.currentWeek || 1,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+    }
   } catch (error) {
     console.error("Error pushing progress:", error);
-    import('../ui/core.js').then(module => module.showToast('Voortgang niet lokaal gesynchroniseerd.', 'error'));
   }
 }
 
@@ -116,17 +121,12 @@ export async function resetCloudProgress() {
  */
 export async function getLeaderboard(communityCode = 'global') {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(
-      usersRef, 
-      where('communities', 'array-contains', communityCode)
-    );
-    const querySnapshot = await getDocs(q);
+    const membersRef = collection(db, 'communities', communityCode, 'members');
+    const querySnapshot = await getDocs(membersRef);
     
     const leaderboard = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      // Handle timestamp conversion safely
       let lastActiveStr = 'Onbekend';
       if (data.lastActive && data.lastActive.toDate) {
         lastActiveStr = data.lastActive.toDate().toLocaleDateString();
@@ -136,21 +136,18 @@ export async function getLeaderboard(communityCode = 'global') {
 
       leaderboard.push({
         id: doc.id,
-        name: data.name || 'Pilates Fan',
-        totalWorkouts: data.totalWorkouts || 0,
-        missedWorkouts: data.missedWorkouts || 0,
+        name: data.displayName || 'Pilates Fan',
+        totalWorkouts: data.score || 0,
+        missedWorkouts: 0,
         currentWeek: data.currentWeek || 1,
         lastActive: lastActiveStr
       });
     });
     
-    // Sort locally by totalWorkouts descending to avoid Firebase composite index requirement
     leaderboard.sort((a, b) => b.totalWorkouts - a.totalWorkouts);
-
     return leaderboard;
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
-    import('../ui/core.js').then(module => module.showToast('Kan leaderboard niet laden. Ben je offline?', 'error'));
     return [];
   }
 }

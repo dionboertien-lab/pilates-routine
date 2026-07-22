@@ -34,7 +34,7 @@ export function renderOnboarding() {
     </div>
   `;
 
-  attachOnboardingListeners(step);
+  attachOnboardingListeners(step, steps.length);
 }
 
 function renderStep0() {
@@ -160,7 +160,7 @@ function canProceed(step, data) {
   return true;
 }
 
-function attachOnboardingListeners(step) {
+function attachOnboardingListeners(step, totalSteps = 5) {
   const prevBtn = document.getElementById('ob-prev');
   const nextBtn = document.getElementById('ob-next');
 
@@ -175,7 +175,7 @@ function attachOnboardingListeners(step) {
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
       saveStepData(step);
-      if (step === steps.length - 1) {
+      if (step === totalSteps - 1) {
         completeOnboarding();
       } else {
         state.onboardingStep++;

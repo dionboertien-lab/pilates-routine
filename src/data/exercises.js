@@ -49,21 +49,25 @@ export const SECTIONS = [
   },
 ];
 
+const PROGRESSION_BY_WEEK = [1.00, 1.05, 1.10, 1.10, 1.15, 1.20, 1.20, 1.25];
+
 export function getWeekProgression(currentWeek, baseLevel = 1) {
-  const effectiveLevel = Math.min(8, baseLevel + currentWeek - 1);
+  const weekIndex = Math.min(Math.max((currentWeek || 1) - 1, 0), PROGRESSION_BY_WEEK.length - 1);
+  const mult = PROGRESSION_BY_WEEK[weekIndex];
   
   const LEVELS = {
-    1: { id: 'l1', label: 'Beginner', mult: 0.7 },
-    2: { id: 'l2', label: 'Beginner+', mult: 0.85 },
-    3: { id: 'l3', label: 'Licht Gemiddeld', mult: 1.0 },
-    4: { id: 'l4', label: 'Gemiddeld', mult: 1.2 },
-    5: { id: 'l5', label: 'Gemiddeld+', mult: 1.45 },
-    6: { id: 'l6', label: 'Gevorderd', mult: 1.75 },
-    7: { id: 'l7', label: 'Gevorderd+', mult: 2.1 },
-    8: { id: 'l8', label: 'Expert', mult: 2.5 },
+    1: { id: 'l1', label: 'Beginner' },
+    2: { id: 'l2', label: 'Beginner+' },
+    3: { id: 'l3', label: 'Licht Gemiddeld' },
+    4: { id: 'l4', label: 'Gemiddeld' },
+    5: { id: 'l5', label: 'Gemiddeld+' },
+    6: { id: 'l6', label: 'Gevorderd' },
+    7: { id: 'l7', label: 'Gevorderd+' },
+    8: { id: 'l8', label: 'Expert' },
   };
 
-  return LEVELS[effectiveLevel] || LEVELS[1];
+  const levelInfo = LEVELS[Math.min(8, Math.max(1, baseLevel))] || LEVELS[1];
+  return { ...levelInfo, mult };
 }
 
 export function applyProgression(exercise, currentWeek, baseLevel = 1) {
@@ -395,6 +399,13 @@ export function getSection(sectionId) {
   return SECTIONS.find(s => s.id === sectionId);
 }
 
+export function matchesTargetGender(exercise, gender = 'female') {
+  if (!exercise || !exercise.targetGender || exercise.targetGender === 'all') return true;
+  if (gender === 'male') return exercise.targetGender === 'male';
+  if (gender === 'female') return exercise.targetGender === 'female';
+  return exercise.targetGender === 'all';
+}
+
 /**
  * Build the workout steps based on goals, current week, baseLevels object, and gender.
  */
@@ -402,8 +413,7 @@ export function buildWorkoutSteps(sectionIds, currentWeek, gender = 'female', ba
   const steps = [];
 
   const filteredExercises = EXERCISES.filter(e => {
-    // Check section
-    return sectionIds.includes(e.sectionId);
+    return sectionIds.includes(e.sectionId) && matchesTargetGender(e, gender);
   });
 
   for (const exercise of filteredExercises) {

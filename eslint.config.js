@@ -1,7 +1,4 @@
-import js from '@eslint/js';
-
 export default [
-  js.configs.recommended,
   {
     languageOptions: {
       ecmaVersion: 2022,
@@ -21,7 +18,8 @@ export default [
         FileReader: 'readonly',
         HTMLVideoElement: 'readonly',
         HTMLCanvasElement: 'readonly',
-        URLSearchParams: 'readonly'
+        URLSearchParams: 'readonly',
+        File: 'readonly'
       }
     },
     rules: {

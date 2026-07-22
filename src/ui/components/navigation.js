@@ -19,9 +19,12 @@ export function getBottomNavHTML(activeTab) {
   ];
 
   return `
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" aria-label="Hoofdnavigatie">
       ${tabs.map(tab => `
-        <button class="bottom-nav__item ${activeTab === tab.id ? 'bottom-nav__item--active' : ''}" data-nav-target="${tab.id}">
+        <button class="bottom-nav__item ${activeTab === tab.id ? 'bottom-nav__item--active' : ''}" 
+                data-nav-target="${tab.id}" 
+                aria-label="${tab.label}"
+                ${activeTab === tab.id ? 'aria-current="page"' : ''}>
           <div class="bottom-nav__icon">${tab.icon}</div>
           <span class="bottom-nav__label">${tab.label}</span>
         </button>
