@@ -93,25 +93,14 @@ export function renderHome() {
 
         <div class="home__biometrics">
           <div class="home__biometrics-header">
-            <span class="home__biometrics-title">Herstelstatus</span>
-            <span class="home__biometrics-source">Smartwatch</span>
+            <span class="home__biometrics-title">Hartslagmeter (Bluetooth)</span>
+            <span class="home__biometrics-source">${state.bluetoothDeviceId ? '🟢 Verbonden' : '⚪ Niet verbonden'}</span>
           </div>
           <div class="home__biometrics-grid">
-            <div class="home__bio-item">
-              <span class="home__bio-val">${localStorage.getItem('pilates_last_score') || '84'}</span>
-              <span class="home__bio-lbl">Score</span>
+            <div class="home__bio-item" style="grid-column: span 3; text-align: center; padding: 0.5rem;">
+              <span class="home__bio-val">${state.bluetoothDeviceId && state.liveBpm ? `${state.liveBpm} BPM` : 'Geen sensor gekoppeld'}</span>
+              <span class="home__bio-lbl">${state.bluetoothDeviceId ? 'Gemeten hartslag' : 'Koppel een Bluetooth hartslagmeter tijdens de workout'}</span>
             </div>
-            <div class="home__bio-item">
-              <span class="home__bio-val">${localStorage.getItem('pilates_last_hrv') || '62'}ms</span>
-              <span class="home__bio-lbl">HRV</span>
-            </div>
-            <div class="home__bio-item">
-              <span class="home__bio-val">${localStorage.getItem('pilates_last_kcal') || '420'}</span>
-              <span class="home__bio-lbl">Kcal</span>
-            </div>
-          </div>
-          <div class="home__bio-insight">
-            ✨ ${localStorage.getItem('pilates_last_insight') || 'Optimaal herstel. Klaar voor een pittige sessie vandaag.'}
           </div>
         </div>
       ` : ''}

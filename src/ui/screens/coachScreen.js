@@ -1,4 +1,4 @@
-import { app, showToast, escapeHTML } from '../core.js';
+import { app, showToast, showDialog, escapeHTML } from '../core.js';
 import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
 import { db } from '../../utils/firebase.js';
 import { getCurrentUser } from '../../utils/auth.js';
@@ -280,15 +280,21 @@ export function renderCoach() {
       if (!file) return;
       fileInput.value = '';
 
-      const isVideo = file.type.startsWith('video/');
-      const fileLabel = isVideo ? '🎥 [Videobestand geüpload voor Vorm-check]' : '📷 [Afbeelding geüpload voor Vorm-check]';
+      showDialog(
+        '🔒 Privacy & AI Form Check',
+        'Vier stilstaande beelden uit je bestand worden verwerkt door Google Gemini AI voor anatomische feedback. Zorg dat er geen gevoelige beelden van derden zichtbaar zijn. Wil je doorgaan met de analyse?',
+        'Ja, verwerk beelden',
+        'Annuleren',
+        async () => {
+          const isVideo = file.type.startsWith('video/');
+          const fileLabel = isVideo ? '🎥 [Videobestand geüpload voor Vorm-check]' : '📷 [Afbeelding geüpload voor Vorm-check]';
 
-      try {
-        await addDoc(chatRef, {
-          role: 'user',
-          text: fileLabel,
-          createdAt: serverTimestamp()
-        });
+          try {
+            await addDoc(chatRef, {
+              role: 'user',
+              text: fileLabel,
+              createdAt: serverTimestamp()
+            });
 
         const downloadCard = document.getElementById('coach-download-card');
         const downloadTitle = document.getElementById('download-status-title');
@@ -356,7 +362,8 @@ export function renderCoach() {
         showToast(`Video-analyse mislukt: ${err.message}`, 'error');
       }
     });
-  }
+  });
+}
 
   // Send Message Logic
   const sendBtn = document.getElementById('coach-send');

@@ -30,7 +30,6 @@ export async function initializeSocialUser(localProfile, localTotal, localWeek, 
       }
       await setDoc(userRef, {
         name: localProfile.name || user.displayName || 'Pilates Fan',
-        email: user.email,
         totalWorkouts: localTotal || 0,
         currentWeek: localWeek || 1,
         missedWorkouts: localMissed || 0,

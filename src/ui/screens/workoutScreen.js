@@ -1,5 +1,5 @@
 import { state } from '../../state.js';
-import { app, render, showDialog, showToast, playBeep } from '../core.js';
+import { app, render, showDialog, showToast, playBeep, escapeHTML } from '../core.js';
 import { getUserName, getProfile, markTodayComplete, getTotalCompleted, getMissedWorkouts } from '../../utils/storage.js';
 import { getSection, getWeekProgression, buildWorkoutSteps } from '../../data/exercises.js';
 import { getCurrentWeek } from '../../utils/storage.js';
@@ -299,22 +299,16 @@ export function startWorkout() {
   state.trackerInterval = setInterval(() => {
     if (state.screen !== 'workout') return;
     
-    // Simulate heart rate if not connected via Bluetooth
-    if (!state.bluetoothDeviceId) {
-      state.liveBpm = Math.floor(90 + Math.random() * 40);
+    // Only update BPM if connected via Bluetooth
+    if (state.bluetoothDeviceId && state.liveBpm) {
       const bpmEl = document.getElementById('live-bpm');
       if (bpmEl) bpmEl.textContent = state.liveBpm;
     }
 
-    // Always simulate kcal for now based on time (or combine with real BPM later)
-    state.liveKcal += 0.08;
-    const kcalEl = document.getElementById('live-kcal');
-    if (kcalEl) kcalEl.textContent = Math.floor(state.liveKcal);
-    
-    // Animate the line slightly to make it look alive
+    // Animate line if active
     const pathEl = document.getElementById('tracker-svg-path');
     if (pathEl) {
-      const shift = Math.floor(Math.random() * 10) - 5;
+      const shift = Math.floor(Math.random() * 6) - 3;
       pathEl.style.transform = `translateY(${shift}px)`;
       pathEl.style.transition = 'transform 0.5s ease';
     }
@@ -514,11 +508,6 @@ function nextStep() {
       disconnectHeartRateMonitor(state.bluetoothDeviceId);
       state.bluetoothDeviceId = null;
     }
-    
-    // Opslaan in localStorage voor het home dashboard
-    localStorage.setItem('pilates_last_kcal', Math.floor(state.liveKcal || 120).toString());
-    localStorage.setItem('pilates_last_hrv', (Math.floor(Math.random() * 20) + 50).toString());
-    localStorage.setItem('pilates_last_score', (Math.floor(Math.random() * 20) + 75).toString());
 
     const focus = state.todayFocus;
     markTodayComplete(focus ? focus.focusEmoji : '✓');
@@ -530,7 +519,7 @@ function nextStep() {
         name: profile.name,
         totalWorkouts: getTotalCompleted(),
         missedWorkouts: getMissedWorkouts(),
-        currentWeek: currentWeek
+        currentWeek: getCurrentWeek()
       };
       console.log('[Workout] Pushing progress to Firebase:', progressData);
       pushUserProgress(progressData);

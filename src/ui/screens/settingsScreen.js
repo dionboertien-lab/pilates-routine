@@ -1,5 +1,5 @@
 import { state } from '../../state.js';
-import { app, render, showDialog } from '../core.js';
+import { app, render, showDialog, escapeHTML } from '../core.js';
 import { getProfile, saveProfile, resetAll, formatDate } from '../../utils/storage.js';
 import { t, getLanguage } from '../../utils/i18n.js';
 import { applyTheme } from '../../main.js';
