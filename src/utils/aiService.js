@@ -295,8 +295,8 @@ export async function extractImageBase64(imageFile) {
 }
 
 export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening', onProgress = null }) {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL') {
-    throw new Error('Google Gemini API-sleutel ontbreekt in de configuratie voor video-analyse.');
+  if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
+    throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie voor video-analyse.');
   }
 
   let frames = [];
@@ -332,7 +332,11 @@ Houd de antwoorden helder, aanmoedigend en professioneel.`;
     }
   }));
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+  const targetEndpoint = AI_PROXY_URL 
+    ? AI_PROXY_URL 
+    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+  const response = await fetch(targetEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

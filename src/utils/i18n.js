@@ -29,7 +29,7 @@ export const translations = {
     'home.workouts': 'Workouts',
     'home.weeks': 'Weken',
     'home.intensity': 'Intensiteit',
-    'home.scienceBadge': 'Science-Backed (TUT)',
+    'home.scienceBadge': 'Opbouw van de routine',
     'home.quote': '♥ Jouw consistentie vandaag, is je resultaat morgen. ♥',
     
     // Calendar
@@ -202,7 +202,7 @@ export const translations = {
     'home.workouts': 'Workouts',
     'home.weeks': 'Weeks',
     'home.intensity': 'Intensity',
-    'home.scienceBadge': 'Science-Backed (TUT)',
+    'home.scienceBadge': 'How the routine works',
     'home.quote': '♥ Your consistency today is your result tomorrow. ♥',
 
     // Calendar
@@ -316,8 +316,8 @@ export const translations = {
     'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
     'dlg.resetAll.title': 'Reset everything?',
     'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
-    'dlg.science.title': '🔬 The Science behind the Routine',
-    'dlg.science.msg': 'This app relies on <b>Time Under Tension (TUT)</b> and <b>Progressive Overload</b>.<br><br><b>TUT:</b> Moving slowly and with control eliminates momentum, causing significantly higher muscle activation and metabolic stress.<br><b>Progressive Overload:</b> The app increases difficulty weekly, forcing your body to adapt (grow stronger).<br><br>This is why fast clicking is blocked. Enjoy the burn!',
+    'dlg.science.title': '🧘 Routine Principles',
+    'dlg.science.msg': 'This routine utilizes a <b>controlled rep tempo</b> and <b>gradual progression</b>.<br><br><b>Controlled Tempo:</b> Moving with control helps focus on balance, posture, and muscle engagement.<br><b>Gradual Progression:</b> The program steps up intensity gradually to challenge your muscles safely.<br><br>Fast clicking is paused to encourage mindful execution.',
 
     // Workout skip/fail
     'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',

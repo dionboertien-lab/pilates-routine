@@ -65,27 +65,16 @@ export function renderWorkout() {
 
         <div class="workout__live-tracker">
           <div class="tracker-header">
-            <span class="tracker-title">Smartwatch Sync</span>
+            <span class="tracker-title">Hartslagmeter (Bluetooth)</span>
             <div style="display: flex; gap: 8px; align-items: center;">
-              <button id="ble-connect-btn" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 0;">🔗</button>
-              <div class="tracker-pulse-dot" id="tracker-pulse-dot"></div>
+              <button id="ble-connect-btn" title="Koppel Hartslagmeter" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 0;">${state.bluetoothDeviceId ? '🟢' : '🔗'}</button>
             </div>
           </div>
           <div class="tracker-stats">
-            <div class="tracker-stat">
-              <span class="tracker-val" id="live-bpm">${state.liveBpm || 85}</span>
-              <span class="tracker-lbl">BPM</span>
+            <div class="tracker-stat" style="width: 100%;">
+              <span class="tracker-val" id="live-bpm">${state.bluetoothDeviceId && state.liveBpm ? `${state.liveBpm} BPM` : '--'}</span>
+              <span class="tracker-lbl">${state.bluetoothDeviceId ? 'Gemeten Hartslag' : 'Geen sensor gekoppeld (tik op 🔗 om te koppelen)'}</span>
             </div>
-            <div class="tracker-stat">
-              <span class="tracker-val" id="live-kcal">${Math.floor(state.liveKcal || 0)}</span>
-              <span class="tracker-lbl">Kcal</span>
-            </div>
-          </div>
-          <div class="tracker-chart">
-             <svg width="100%" height="40" viewBox="0 0 100 40" preserveAspectRatio="none">
-               <path d="M0,30 L10,25 L20,35 L30,15 L40,25 L50,5 L60,20 L70,30 L80,10 L90,25 L100,20" 
-                     fill="none" stroke="var(--sage)" stroke-width="2" class="tracker-line" id="tracker-svg-path" />
-             </svg>
           </div>
         </div>
 
@@ -292,8 +281,8 @@ export function startWorkout() {
   state.currentSectionId = null;
   state.skippedCount = 0;
   state.skippedCoreCount = 0;
-  state.liveKcal = 0;
-  state.liveBpm = 85;
+  state.liveKcal = null;
+  state.liveBpm = null;
   
   if (state.trackerInterval) clearInterval(state.trackerInterval);
   state.trackerInterval = setInterval(() => {
@@ -302,15 +291,7 @@ export function startWorkout() {
     // Only update BPM if connected via Bluetooth
     if (state.bluetoothDeviceId && state.liveBpm) {
       const bpmEl = document.getElementById('live-bpm');
-      if (bpmEl) bpmEl.textContent = state.liveBpm;
-    }
-
-    // Animate line if active
-    const pathEl = document.getElementById('tracker-svg-path');
-    if (pathEl) {
-      const shift = Math.floor(Math.random() * 6) - 3;
-      pathEl.style.transform = `translateY(${shift}px)`;
-      pathEl.style.transition = 'transform 0.5s ease';
+      if (bpmEl) bpmEl.textContent = `${state.liveBpm} BPM`;
     }
   }, 1000);
 
@@ -484,21 +465,6 @@ function nextStep() {
   const nextIndex = state.currentStepIndex + 1;
 
   if (nextIndex >= steps.length) {
-    const coreSteps = steps.filter(s => s.sectionId !== 'warmup' && s.sectionId !== 'stretch');
-    const totalCoreCount = coreSteps.length || 1;
-    const skippedCoreCount = state.skippedCoreCount || 0;
-
-    if (skippedCoreCount > totalCoreCount / 2) {
-      showDialog(
-        t('wk.notCompleted.title'),
-        t('wk.notCompleted.msg'),
-        t('btn.confirm'),
-        null,
-        () => { state.screen = 'home'; render(); }
-      );
-      return;
-    }
-
     if (state.trackerInterval) {
       clearInterval(state.trackerInterval);
       state.trackerInterval = null;

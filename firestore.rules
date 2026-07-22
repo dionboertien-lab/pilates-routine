@@ -2,13 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow read: if request.auth != null;
-      // Users can only update their own documents. We prevent totalWorkouts from decreasing (XR.2, XR.8 protection) and enforce string constraints.
-      allow write: if request.auth != null 
-                   && request.auth.uid == userId
-                   && (resource == null || !('totalWorkouts' in request.resource.data) || !('totalWorkouts' in resource.data) || request.resource.data.totalWorkouts >= resource.data.totalWorkouts)
-                   && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50));
-                   
+      // Users can strictly only read, write, and delete their own user document
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null 
+                            && request.auth.uid == userId
+                            && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50));
+                    
       match /chats/{chatId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

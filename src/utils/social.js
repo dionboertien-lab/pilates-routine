@@ -1,7 +1,7 @@
 import { db } from './firebase.js';
 import { getCurrentUser } from './auth.js';
 import { 
-  doc, setDoc, getDoc, getDocs, 
+  doc, setDoc, getDoc, getDocs, deleteDoc,
   collection, query, orderBy, where, 
   arrayUnion, serverTimestamp 
 } from 'firebase/firestore';
@@ -105,14 +105,9 @@ export async function resetCloudProgress() {
     const user = getCurrentUser();
     if (!user) return;
     const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      totalWorkouts: 0,
-      currentWeek: 1,
-      missedWorkouts: 0,
-      lastActive: serverTimestamp()
-    }, { merge: true });
+    await deleteDoc(userRef);
   } catch (error) {
-    console.warn("Could not reset cloud progress:", error);
+    console.warn("Could not delete cloud user document:", error);
   }
 }
 

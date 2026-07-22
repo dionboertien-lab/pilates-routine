@@ -13,12 +13,13 @@ Dit document bevat de complete broncode van de Pilates Routine web-app.
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "vite build",
+    "lint": "eslint src",
     "test": "vitest run"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.1",
+    "eslint": "^9.0.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
     "vitest": "^3.0.0"
@@ -45,13 +46,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow read: if request.auth != null;
-      // Users can only update their own documents. We prevent totalWorkouts from decreasing (XR.2, XR.8 protection) and enforce string constraints.
-      allow write: if request.auth != null 
-                   && request.auth.uid == userId
-                   && (resource == null || !('totalWorkouts' in request.resource.data) || !('totalWorkouts' in resource.data) || request.resource.data.totalWorkouts >= resource.data.totalWorkouts)
-                   && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50));
-                   
+      // Users can strictly only read, write, and delete their own user document
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null 
+                            && request.auth.uid == userId
+                            && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50));
+                    
       match /chats/{chatId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
@@ -69,6 +69,43 @@ service cloud.firestore {
     }
   }
 }
+
+```
+
+## Bestand: eslint.config.js
+```js
+import js from '@eslint/js';
+
+export default [
+  js.configs.recommended,
+  {
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        localStorage: 'readonly',
+        navigator: 'readonly',
+        fetch: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        URL: 'readonly',
+        FileReader: 'readonly',
+        HTMLVideoElement: 'readonly',
+        HTMLCanvasElement: 'readonly',
+        URLSearchParams: 'readonly'
+      }
+    },
+    rules: {
+      'no-unused-vars': 'warn',
+      'no-undef': 'error'
+    }
+  }
+];
 
 ```
 
@@ -232,6 +269,12 @@ export const state = {
   comboPhase: 'reps',
   exerciseComplete: false,
   skippedCount: 0,
+  skippedCoreCount: 0,
+  liveBpm: null,
+  liveKcal: null,
+  bluetoothDeviceId: null,
+  trackerInterval: null,
+  justFinishedWorkout: false,
   // Social/Auth State
   currentUser: null,
   authLoading: true,
@@ -3129,15 +3172,9 @@ export function getSection(sectionId) {
 export function buildWorkoutSteps(sectionIds, currentWeek, gender = 'female', baseLevels = {}) {
   const steps = [];
 
-  // Determine user gender category (neutral maps to female for routine flow)
-  const userGender = (gender === 'male') ? 'male' : 'female';
-
   const filteredExercises = EXERCISES.filter(e => {
     // Check section
-    if (!sectionIds.includes(e.sectionId)) return false;
-    // Check gender
-    if (e.targetGender !== 'all' && e.targetGender !== userGender) return false;
-    return true;
+    return sectionIds.includes(e.sectionId);
   });
 
   for (const exercise of filteredExercises) {
@@ -3474,8 +3511,8 @@ export async function extractImageBase64(imageFile) {
 }
 
 export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening', onProgress = null }) {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL') {
-    throw new Error('Google Gemini API-sleutel ontbreekt in de configuratie voor video-analyse.');
+  if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
+    throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie voor video-analyse.');
   }
 
   let frames = [];
@@ -3511,7 +3548,11 @@ Houd de antwoorden helder, aanmoedigend en professioneel.`;
     }
   }));
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+  const targetEndpoint = AI_PROXY_URL 
+    ? AI_PROXY_URL 
+    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+  const response = await fetch(targetEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -4063,7 +4104,7 @@ function getWorkoutDayIndex() {
 import { db } from './firebase.js';
 import { getCurrentUser } from './auth.js';
 import { 
-  doc, setDoc, getDoc, getDocs, 
+  doc, setDoc, getDoc, getDocs, deleteDoc,
   collection, query, orderBy, where, 
   arrayUnion, serverTimestamp 
 } from 'firebase/firestore';
@@ -4167,14 +4208,9 @@ export async function resetCloudProgress() {
     const user = getCurrentUser();
     if (!user) return;
     const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      totalWorkouts: 0,
-      currentWeek: 1,
-      missedWorkouts: 0,
-      lastActive: serverTimestamp()
-    }, { merge: true });
+    await deleteDoc(userRef);
   } catch (error) {
-    console.warn("Could not reset cloud progress:", error);
+    console.warn("Could not delete cloud user document:", error);
   }
 }
 
@@ -4452,7 +4488,7 @@ export const translations = {
     'home.workouts': 'Workouts',
     'home.weeks': 'Weken',
     'home.intensity': 'Intensiteit',
-    'home.scienceBadge': 'Science-Backed (TUT)',
+    'home.scienceBadge': 'Opbouw van de routine',
     'home.quote': '♥ Jouw consistentie vandaag, is je resultaat morgen. ♥',
     
     // Calendar
@@ -4625,7 +4661,7 @@ export const translations = {
     'home.workouts': 'Workouts',
     'home.weeks': 'Weeks',
     'home.intensity': 'Intensity',
-    'home.scienceBadge': 'Science-Backed (TUT)',
+    'home.scienceBadge': 'How the routine works',
     'home.quote': '♥ Your consistency today is your result tomorrow. ♥',
 
     // Calendar
@@ -4739,8 +4775,8 @@ export const translations = {
     'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
     'dlg.resetAll.title': 'Reset everything?',
     'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
-    'dlg.science.title': '🔬 The Science behind the Routine',
-    'dlg.science.msg': 'This app relies on <b>Time Under Tension (TUT)</b> and <b>Progressive Overload</b>.<br><br><b>TUT:</b> Moving slowly and with control eliminates momentum, causing significantly higher muscle activation and metabolic stress.<br><b>Progressive Overload:</b> The app increases difficulty weekly, forcing your body to adapt (grow stronger).<br><br>This is why fast clicking is blocked. Enjoy the burn!',
+    'dlg.science.title': '🧘 Routine Principles',
+    'dlg.science.msg': 'This routine utilizes a <b>controlled rep tempo</b> and <b>gradual progression</b>.<br><br><b>Controlled Tempo:</b> Moving with control helps focus on balance, posture, and muscle engagement.<br><b>Gradual Progression:</b> The program steps up intensity gradually to challenge your muscles safely.<br><br>Fast clicking is paused to encourage mindful execution.',
 
     // Workout skip/fail
     'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',
@@ -5355,27 +5391,16 @@ export function renderWorkout() {
 
         <div class="workout__live-tracker">
           <div class="tracker-header">
-            <span class="tracker-title">Smartwatch Sync</span>
+            <span class="tracker-title">Hartslagmeter (Bluetooth)</span>
             <div style="display: flex; gap: 8px; align-items: center;">
-              <button id="ble-connect-btn" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 0;">🔗</button>
-              <div class="tracker-pulse-dot" id="tracker-pulse-dot"></div>
+              <button id="ble-connect-btn" title="Koppel Hartslagmeter" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 0;">${state.bluetoothDeviceId ? '🟢' : '🔗'}</button>
             </div>
           </div>
           <div class="tracker-stats">
-            <div class="tracker-stat">
-              <span class="tracker-val" id="live-bpm">${state.liveBpm || 85}</span>
-              <span class="tracker-lbl">BPM</span>
+            <div class="tracker-stat" style="width: 100%;">
+              <span class="tracker-val" id="live-bpm">${state.bluetoothDeviceId && state.liveBpm ? `${state.liveBpm} BPM` : '--'}</span>
+              <span class="tracker-lbl">${state.bluetoothDeviceId ? 'Gemeten Hartslag' : 'Geen sensor gekoppeld (tik op 🔗 om te koppelen)'}</span>
             </div>
-            <div class="tracker-stat">
-              <span class="tracker-val" id="live-kcal">${Math.floor(state.liveKcal || 0)}</span>
-              <span class="tracker-lbl">Kcal</span>
-            </div>
-          </div>
-          <div class="tracker-chart">
-             <svg width="100%" height="40" viewBox="0 0 100 40" preserveAspectRatio="none">
-               <path d="M0,30 L10,25 L20,35 L30,15 L40,25 L50,5 L60,20 L70,30 L80,10 L90,25 L100,20" 
-                     fill="none" stroke="var(--sage)" stroke-width="2" class="tracker-line" id="tracker-svg-path" />
-             </svg>
           </div>
         </div>
 
@@ -5582,8 +5607,8 @@ export function startWorkout() {
   state.currentSectionId = null;
   state.skippedCount = 0;
   state.skippedCoreCount = 0;
-  state.liveKcal = 0;
-  state.liveBpm = 85;
+  state.liveKcal = null;
+  state.liveBpm = null;
   
   if (state.trackerInterval) clearInterval(state.trackerInterval);
   state.trackerInterval = setInterval(() => {
@@ -5592,15 +5617,7 @@ export function startWorkout() {
     // Only update BPM if connected via Bluetooth
     if (state.bluetoothDeviceId && state.liveBpm) {
       const bpmEl = document.getElementById('live-bpm');
-      if (bpmEl) bpmEl.textContent = state.liveBpm;
-    }
-
-    // Animate line if active
-    const pathEl = document.getElementById('tracker-svg-path');
-    if (pathEl) {
-      const shift = Math.floor(Math.random() * 6) - 3;
-      pathEl.style.transform = `translateY(${shift}px)`;
-      pathEl.style.transition = 'transform 0.5s ease';
+      if (bpmEl) bpmEl.textContent = `${state.liveBpm} BPM`;
     }
   }, 1000);
 
@@ -5774,21 +5791,6 @@ function nextStep() {
   const nextIndex = state.currentStepIndex + 1;
 
   if (nextIndex >= steps.length) {
-    const coreSteps = steps.filter(s => s.sectionId !== 'warmup' && s.sectionId !== 'stretch');
-    const totalCoreCount = coreSteps.length || 1;
-    const skippedCoreCount = state.skippedCoreCount || 0;
-
-    if (skippedCoreCount > totalCoreCount / 2) {
-      showDialog(
-        t('wk.notCompleted.title'),
-        t('wk.notCompleted.msg'),
-        t('btn.confirm'),
-        null,
-        () => { state.screen = 'home'; render(); }
-      );
-      return;
-    }
-
     if (state.trackerInterval) {
       clearInterval(state.trackerInterval);
       state.trackerInterval = null;

@@ -401,15 +401,9 @@ export function getSection(sectionId) {
 export function buildWorkoutSteps(sectionIds, currentWeek, gender = 'female', baseLevels = {}) {
   const steps = [];
 
-  // Determine user gender category (neutral maps to female for routine flow)
-  const userGender = (gender === 'male') ? 'male' : 'female';
-
   const filteredExercises = EXERCISES.filter(e => {
     // Check section
-    if (!sectionIds.includes(e.sectionId)) return false;
-    // Check gender
-    if (e.targetGender !== 'all' && e.targetGender !== userGender) return false;
-    return true;
+    return sectionIds.includes(e.sectionId);
   });
 
   for (const exercise of filteredExercises) {

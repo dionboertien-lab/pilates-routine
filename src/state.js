@@ -16,6 +16,12 @@ export const state = {
   comboPhase: 'reps',
   exerciseComplete: false,
   skippedCount: 0,
+  skippedCoreCount: 0,
+  liveBpm: null,
+  liveKcal: null,
+  bluetoothDeviceId: null,
+  trackerInterval: null,
+  justFinishedWorkout: false,
   // Social/Auth State
   currentUser: null,
   authLoading: true,
