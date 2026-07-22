@@ -106,8 +106,8 @@ export function renderCoach() {
               <label class="coach__radio-card ${currentProvider === 'cloud' ? 'coach__radio-card--selected' : ''}" id="option-cloud">
                 <input type="radio" name="ai_provider_radio" value="cloud" ${currentProvider === 'cloud' ? 'checked' : ''} />
                 <div class="coach__radio-content">
-                  <strong>☁️ Google Gemini (Cloud)</strong>
-                  <p>Snelle reacties via Google API. Geen download vereist.</p>
+                  <strong>☁️ Google Gemini Cloud (Aanbevolen)</strong>
+                  <p>Directe antwoorden & Vorm Check. Lichtgewicht (0 MB download).</p>
                 </div>
               </label>
 
@@ -115,7 +115,7 @@ export function renderCoach() {
                 <input type="radio" name="ai_provider_radio" value="local" ${currentProvider === 'local' ? 'checked' : ''} />
                 <div class="coach__radio-content">
                   <strong>📱 Lokale LLM (On-Device via WebGPU)</strong>
-                  <p>100% lokaal, offline en privé. Downloadt het model eenmalig.</p>
+                  <p>100% lokaal & privé. ⚠️ Vereist eenmalige download van 0.35 - 1.9 GB en WebGPU ondersteuning op je mobiel.</p>
                 </div>
               </label>
             </div>

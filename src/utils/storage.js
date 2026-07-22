@@ -321,11 +321,18 @@ export function resetProgress() {
 }
 
 /**
- * Reset everything including profile (full reset).
+ * Reset everything including profile (full reset of local and cloud progress).
  */
-export function resetAll() {
-  localStorage.removeItem(STORAGE_KEYS.PROFILE);
-  localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
+export async function resetAll() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.PROFILE);
+    localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
+    localStorage.removeItem('pilates_pending_invite');
+    const { resetCloudProgress } = await import('./social.js');
+    await resetCloudProgress();
+  } catch (e) {
+    console.error('Error during resetAll:', e);
+  }
 }
 
 /**

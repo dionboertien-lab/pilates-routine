@@ -98,6 +98,25 @@ export async function pushUserProgress(data) {
 }
 
 /**
+ * Reset cloud progress for authenticated user.
+ */
+export async function resetCloudProgress() {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      totalWorkouts: 0,
+      currentWeek: 1,
+      missedWorkouts: 0,
+      lastActive: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.warn("Could not reset cloud progress:", error);
+  }
+}
+
+/**
  * Fetch the leaderboard for a specific community.
  */
 export async function getLeaderboard(communityCode = 'global') {

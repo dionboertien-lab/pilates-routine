@@ -13,13 +13,15 @@ Dit document bevat de complete broncode van de Pilates Routine web-app.
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "vite build"
+    "lint": "vite build",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.1",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^8.2.0",
@@ -2706,6 +2708,18 @@ html {
   padding-bottom: 2rem;
 }
 
+/* ─── Accessibility & Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 
 
 ```
@@ -3166,6 +3180,7 @@ export function buildWorkoutSteps(sectionIds, currentWeek, gender = 'female', ba
 import { CreateMLCEngine } from '@mlc-ai/web-llm';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL; // Optional backend proxy endpoint
 
 export const AVAILABLE_LOCAL_MODELS = [
   {
@@ -3346,8 +3361,8 @@ export async function generateAIResponse({ prompt, history = [], systemInstructi
     return completion.choices[0]?.message?.content || 'Geen antwoord gegenereerd.';
   } else {
     // Cloud API via Google Gemini REST API
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL') {
-      throw new Error('Google Gemini API-sleutel ontbreekt in de configuratie.');
+    if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
+      throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie.');
     }
 
     const contentsHistory = [];
@@ -3370,7 +3385,11 @@ export async function generateAIResponse({ prompt, history = [], systemInstructi
       }
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+    const targetEndpoint = AI_PROXY_URL 
+      ? AI_PROXY_URL 
+      : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(targetEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3851,11 +3870,18 @@ export function resetProgress() {
 }
 
 /**
- * Reset everything including profile (full reset).
+ * Reset everything including profile (full reset of local and cloud progress).
  */
-export function resetAll() {
-  localStorage.removeItem(STORAGE_KEYS.PROFILE);
-  localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
+export async function resetAll() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.PROFILE);
+    localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
+    localStorage.removeItem('pilates_pending_invite');
+    const { resetCloudProgress } = await import('./social.js');
+    await resetCloudProgress();
+  } catch (e) {
+    console.error('Error during resetAll:', e);
+  }
 }
 
 /**
@@ -4130,6 +4156,25 @@ export async function pushUserProgress(data) {
   } catch (error) {
     console.error("Error pushing progress:", error);
     import('../ui/core.js').then(module => module.showToast('Voortgang niet lokaal gesynchroniseerd.', 'error'));
+  }
+}
+
+/**
+ * Reset cloud progress for authenticated user.
+ */
+export async function resetCloudProgress() {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      totalWorkouts: 0,
+      currentWeek: 1,
+      missedWorkouts: 0,
+      lastActive: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.warn("Could not reset cloud progress:", error);
   }
 }
 
@@ -4519,10 +4564,10 @@ export const translations = {
     'dlg.quit.cancel': 'Stoppen',
     'dlg.reset.title': 'Voortgang resetten?',
     'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
-    'dlg.resetAll.title': 'Alles resetten?',
-    'dlg.resetAll.msg': 'Je profiel én voortgang worden gewist.',
-    'dlg.science.title': '🔬 De Wetenschap achter de Routine',
-    'dlg.science.msg': 'Deze app maakt gebruik van <b>Time Under Tension (TUT)</b> en <b>Progressive Overload</b>.<br><br><b>TUT:</b> Door langzaam en gecontroleerd te bewegen elimineer je momentum, wat zorgt voor een veel hogere spieractivatie en metabole stress.<br><b>Progressive Overload:</b> De app verhoogt wekelijks de moeilijkheidsgraad, waardoor je lichaam gedwongen wordt om zich aan te passen (sterker te worden).<br><br>Daarom is snel klikken geblokkeerd. Geniet van de spierpijn!',
+    'dlg.resetAll.title': 'Alles resetten (Lokaal & Cloud)?',
+    'dlg.resetAll.msg': 'Je lokale profiel én je opgeslagen cloud-voortgang worden hiermee volledig gewist.',
+    'dlg.science.title': '🧘 Principes van de Routine',
+    'dlg.science.msg': 'Deze routine maakt gebruik van een <b>rustig herhalingstempo</b> en <b>geleidelijke opbouw</b>.<br><br><b>Rustig tempo:</b> Door gecontroleerd te bewegen focus je op balans, houding en spierbeheersing.<br><b>Geleidelijke opbouw:</b> Het programma verhoogt in stappen de intensiteit om je spieren op een veilige manier uit te dagen.<br><br>Daarom is te snel doorklikken geblokkeerd.',
 
     // Workout skip/fail
     'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',
@@ -5918,8 +5963,8 @@ export function renderCoach() {
               <label class="coach__radio-card ${currentProvider === 'cloud' ? 'coach__radio-card--selected' : ''}" id="option-cloud">
                 <input type="radio" name="ai_provider_radio" value="cloud" ${currentProvider === 'cloud' ? 'checked' : ''} />
                 <div class="coach__radio-content">
-                  <strong>☁️ Google Gemini (Cloud)</strong>
-                  <p>Snelle reacties via Google API. Geen download vereist.</p>
+                  <strong>☁️ Google Gemini Cloud (Aanbevolen)</strong>
+                  <p>Directe antwoorden & Vorm Check. Lichtgewicht (0 MB download).</p>
                 </div>
               </label>
 
@@ -5927,7 +5972,7 @@ export function renderCoach() {
                 <input type="radio" name="ai_provider_radio" value="local" ${currentProvider === 'local' ? 'checked' : ''} />
                 <div class="coach__radio-content">
                   <strong>📱 Lokale LLM (On-Device via WebGPU)</strong>
-                  <p>100% lokaal, offline en privé. Downloadt het model eenmalig.</p>
+                  <p>100% lokaal & privé. ⚠️ Vereist eenmalige download van 0.35 - 1.9 GB en WebGPU ondersteuning op je mobiel.</p>
                 </div>
               </label>
             </div>

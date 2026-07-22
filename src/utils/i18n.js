@@ -141,10 +141,10 @@ export const translations = {
     'dlg.quit.cancel': 'Stoppen',
     'dlg.reset.title': 'Voortgang resetten?',
     'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
-    'dlg.resetAll.title': 'Alles resetten?',
-    'dlg.resetAll.msg': 'Je profiel én voortgang worden gewist.',
-    'dlg.science.title': '🔬 De Wetenschap achter de Routine',
-    'dlg.science.msg': 'Deze app maakt gebruik van <b>Time Under Tension (TUT)</b> en <b>Progressive Overload</b>.<br><br><b>TUT:</b> Door langzaam en gecontroleerd te bewegen elimineer je momentum, wat zorgt voor een veel hogere spieractivatie en metabole stress.<br><b>Progressive Overload:</b> De app verhoogt wekelijks de moeilijkheidsgraad, waardoor je lichaam gedwongen wordt om zich aan te passen (sterker te worden).<br><br>Daarom is snel klikken geblokkeerd. Geniet van de spierpijn!',
+    'dlg.resetAll.title': 'Alles resetten (Lokaal & Cloud)?',
+    'dlg.resetAll.msg': 'Je lokale profiel én je opgeslagen cloud-voortgang worden hiermee volledig gewist.',
+    'dlg.science.title': '🧘 Principes van de Routine',
+    'dlg.science.msg': 'Deze routine maakt gebruik van een <b>rustig herhalingstempo</b> en <b>geleidelijke opbouw</b>.<br><br><b>Rustig tempo:</b> Door gecontroleerd te bewegen focus je op balans, houding en spierbeheersing.<br><b>Geleidelijke opbouw:</b> Het programma verhoogt in stappen de intensiteit om je spieren op een veilige manier uit te dagen.<br><br>Daarom is te snel doorklikken geblokkeerd.',
 
     // Workout skip/fail
     'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',

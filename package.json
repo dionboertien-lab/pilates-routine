@@ -7,13 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "vite build"
+    "lint": "vite build",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.1",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^8.2.0",

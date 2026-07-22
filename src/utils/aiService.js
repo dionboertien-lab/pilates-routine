@@ -1,6 +1,7 @@
 import { CreateMLCEngine } from '@mlc-ai/web-llm';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL; // Optional backend proxy endpoint
 
 export const AVAILABLE_LOCAL_MODELS = [
   {
@@ -181,8 +182,8 @@ export async function generateAIResponse({ prompt, history = [], systemInstructi
     return completion.choices[0]?.message?.content || 'Geen antwoord gegenereerd.';
   } else {
     // Cloud API via Google Gemini REST API
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL') {
-      throw new Error('Google Gemini API-sleutel ontbreekt in de configuratie.');
+    if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
+      throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie.');
     }
 
     const contentsHistory = [];
@@ -205,7 +206,11 @@ export async function generateAIResponse({ prompt, history = [], systemInstructi
       }
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+    const targetEndpoint = AI_PROXY_URL 
+      ? AI_PROXY_URL 
+      : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(targetEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
