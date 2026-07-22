@@ -34,6 +34,49 @@ const DEFAULT_PROFILE = {
   schemaVersion: 1,
 };
 
+export function parseLocalISODate(dateString) {
+  if (!dateString || typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return null;
+  }
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function clampInteger(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+export function normalizeProfile(input = {}) {
+  return {
+    ...DEFAULT_PROFILE,
+    name: typeof input.name === 'string' ? input.name.trim().slice(0, 50) : '',
+    goals: Array.isArray(input.goals) 
+      ? input.goals.filter(g => ['alles', 'core', 'rug', 'benen-billen'].includes(g)) 
+      : ['alles'],
+    dailyMinutes: [10, 15, 20].includes(Number(input.dailyMinutes)) ? Number(input.dailyMinutes) : 15,
+    daysPerWeek: clampInteger(input.daysPerWeek, 1, 7, 6),
+    theme: ['auto', 'light', 'dark'].includes(input.theme) ? input.theme : 'auto',
+    language: ['nl', 'en'].includes(input.language) ? input.language : 'nl',
+    startDate: parseLocalISODate(input.startDate) ? input.startDate : formatDate(new Date()),
+    baseLevels: {
+      'core': clampInteger(input.baseLevels?.['core'], 0, 8, 1),
+      'benen-billen': clampInteger(input.baseLevels?.['benen-billen'], 0, 8, 1),
+      'rug-houding': clampInteger(input.baseLevels?.['rug-houding'], 0, 8, 1),
+    },
+    includeStretch: input.includeStretch !== false,
+    onboardingComplete: input.onboardingComplete === true,
+    schemaVersion: 2
+  };
+}
+
 /**
  * Get the user profile. Returns null if onboarding not complete.
  */
@@ -47,25 +90,7 @@ export function getProfile() {
       console.error('Failed to parse profile', e);
       return null;
     }
-    const profile = { ...DEFAULT_PROFILE, ...parsed };
-    
-    // Migrate old baseLevel to new baseLevels if necessary
-    if (parsed.baseLevel !== undefined && !parsed.baseLevels) {
-      profile.baseLevels = {
-        'core': parsed.baseLevel,
-        'benen-billen': parsed.baseLevel,
-        'rug-houding': parsed.baseLevel
-      };
-      delete profile.baseLevel;
-      saveProfile(profile);
-    } else {
-      // Deep-merge baseLevels: ensure all section keys exist with correct values
-      profile.baseLevels = {
-        ...DEFAULT_PROFILE.baseLevels,
-        ...(parsed.baseLevels || {})
-      };
-    }
-    return profile;
+    return normalizeProfile(parsed);
   }
   return null;
 }

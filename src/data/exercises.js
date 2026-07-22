@@ -49,25 +49,45 @@ export const SECTIONS = [
   },
 ];
 
-const PROGRESSION_BY_WEEK = [1.00, 1.05, 1.10, 1.10, 1.15, 1.20, 1.20, 1.25];
+const WEEK_MULTIPLIERS = [1.00, 1.05, 1.10, 1.10, 1.15, 1.20, 1.20, 1.25];
 
-export function getWeekProgression(currentWeek, baseLevel = 1) {
-  const weekIndex = Math.min(Math.max((currentWeek || 1) - 1, 0), PROGRESSION_BY_WEEK.length - 1);
-  const mult = PROGRESSION_BY_WEEK[weekIndex];
-  
-  const LEVELS = {
-    1: { id: 'l1', label: 'Beginner' },
-    2: { id: 'l2', label: 'Beginner+' },
-    3: { id: 'l3', label: 'Licht Gemiddeld' },
-    4: { id: 'l4', label: 'Gemiddeld' },
-    5: { id: 'l5', label: 'Gemiddeld+' },
-    6: { id: 'l6', label: 'Gevorderd' },
-    7: { id: 'l7', label: 'Gevorderd+' },
-    8: { id: 'l8', label: 'Expert' },
+const LEVEL_MULTIPLIERS = {
+  1: 0.75,
+  2: 0.85,
+  3: 0.95,
+  4: 1.00,
+  5: 1.10,
+  6: 1.20,
+  7: 1.30,
+  8: 1.40
+};
+
+const LEVEL_LABELS = {
+  1: 'Beginner',
+  2: 'Beginner+',
+  3: 'Licht Gemiddeld',
+  4: 'Gemiddeld',
+  5: 'Gemiddeld+',
+  6: 'Gevorderd',
+  7: 'Gevorderd+',
+  8: 'Expert'
+};
+
+export function getWeekProgression(currentWeek = 1, baseLevel = 1) {
+  const safeWeek = Math.min(8, Math.max(1, Number(currentWeek) || 1));
+  const safeLevel = Math.min(8, Math.max(1, Number(baseLevel) || 1));
+
+  const weekMultiplier = WEEK_MULTIPLIERS[safeWeek - 1];
+  const levelMultiplier = LEVEL_MULTIPLIERS[safeLevel];
+  const mult = Math.round(weekMultiplier * levelMultiplier * 100) / 100;
+
+  return {
+    id: `l${safeLevel}`,
+    label: LEVEL_LABELS[safeLevel],
+    weekMultiplier,
+    levelMultiplier,
+    mult
   };
-
-  const levelInfo = LEVELS[Math.min(8, Math.max(1, baseLevel))] || LEVELS[1];
-  return { ...levelInfo, mult };
 }
 
 export function applyProgression(exercise, currentWeek, baseLevel = 1) {

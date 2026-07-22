@@ -45,21 +45,30 @@ Dit document bevat de complete broncode van de Pilates Routine web-app.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function validUserData() {
+      return (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50))
+      && (!('totalWorkouts' in request.resource.data) || (request.resource.data.totalWorkouts is int && request.resource.data.totalWorkouts >= 0))
+      && (!('currentWeek' in request.resource.data) || (request.resource.data.currentWeek is int && request.resource.data.currentWeek >= 1 && request.resource.data.currentWeek <= 8));
+    }
+
     match /users/{userId} {
-      // Users can strictly only read, write, and delete their own user document
       allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null 
-                            && request.auth.uid == userId
-                            && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50));
+      allow create, update: if request.auth != null && request.auth.uid == userId && validUserData();
                     
       match /chats/{chatId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null 
+                      && request.auth.uid == userId
+                      && request.resource.data.keys().hasOnly(['role', 'text', 'createdAt'])
+                      && request.resource.data.role in ['user', 'model']
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() <= 10000;
+        allow update, delete: if false;
       }
     }
     
     match /communities/{communityId} {
       allow read: if request.auth != null;
-      // Ensure ownerId is the creator and name is validated
       allow create: if request.auth != null 
                     && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.name is string
@@ -69,7 +78,13 @@ service cloud.firestore {
 
       match /members/{memberUid} {
         allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == memberUid;
+        allow create: if request.auth != null && request.auth.uid == memberUid;
+        allow update: if request.auth != null 
+                      && request.auth.uid == memberUid
+                      && request.resource.data.score is int
+                      && request.resource.data.score >= resource.data.score
+                      && request.resource.data.score <= resource.data.score + 1;
+        allow delete: if request.auth != null && request.auth.uid == memberUid;
       }
     }
   }
@@ -2830,25 +2845,45 @@ export const SECTIONS = [
   },
 ];
 
-const PROGRESSION_BY_WEEK = [1.00, 1.05, 1.10, 1.10, 1.15, 1.20, 1.20, 1.25];
+const WEEK_MULTIPLIERS = [1.00, 1.05, 1.10, 1.10, 1.15, 1.20, 1.20, 1.25];
 
-export function getWeekProgression(currentWeek, baseLevel = 1) {
-  const weekIndex = Math.min(Math.max((currentWeek || 1) - 1, 0), PROGRESSION_BY_WEEK.length - 1);
-  const mult = PROGRESSION_BY_WEEK[weekIndex];
-  
-  const LEVELS = {
-    1: { id: 'l1', label: 'Beginner' },
-    2: { id: 'l2', label: 'Beginner+' },
-    3: { id: 'l3', label: 'Licht Gemiddeld' },
-    4: { id: 'l4', label: 'Gemiddeld' },
-    5: { id: 'l5', label: 'Gemiddeld+' },
-    6: { id: 'l6', label: 'Gevorderd' },
-    7: { id: 'l7', label: 'Gevorderd+' },
-    8: { id: 'l8', label: 'Expert' },
+const LEVEL_MULTIPLIERS = {
+  1: 0.75,
+  2: 0.85,
+  3: 0.95,
+  4: 1.00,
+  5: 1.10,
+  6: 1.20,
+  7: 1.30,
+  8: 1.40
+};
+
+const LEVEL_LABELS = {
+  1: 'Beginner',
+  2: 'Beginner+',
+  3: 'Licht Gemiddeld',
+  4: 'Gemiddeld',
+  5: 'Gemiddeld+',
+  6: 'Gevorderd',
+  7: 'Gevorderd+',
+  8: 'Expert'
+};
+
+export function getWeekProgression(currentWeek = 1, baseLevel = 1) {
+  const safeWeek = Math.min(8, Math.max(1, Number(currentWeek) || 1));
+  const safeLevel = Math.min(8, Math.max(1, Number(baseLevel) || 1));
+
+  const weekMultiplier = WEEK_MULTIPLIERS[safeWeek - 1];
+  const levelMultiplier = LEVEL_MULTIPLIERS[safeLevel];
+  const mult = Math.round(weekMultiplier * levelMultiplier * 100) / 100;
+
+  return {
+    id: `l${safeLevel}`,
+    label: LEVEL_LABELS[safeLevel],
+    weekMultiplier,
+    levelMultiplier,
+    mult
   };
-
-  const levelInfo = LEVELS[Math.min(8, Math.max(1, baseLevel))] || LEVELS[1];
-  return { ...levelInfo, mult };
 }
 
 export function applyProgression(exercise, currentWeek, baseLevel = 1) {
@@ -3461,19 +3496,56 @@ export async function generateAIResponse({ prompt, history = [], systemInstructi
   }
 }
 
+function seekVideo(video, time, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Video-seek duurde te lang.'));
+    }, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('error', handleError);
+    }
+
+    function handleSeeked() {
+      cleanup();
+      resolve();
+    }
+
+    function handleError() {
+      cleanup();
+      reject(new Error('Video-frame kon niet geladen worden.'));
+    }
+
+    video.addEventListener('seeked', handleSeeked, { once: true });
+    video.addEventListener('error', handleError, { once: true });
+    video.currentTime = time;
+  });
+}
+
 export async function extractVideoKeyframes(videoFile, numFrames = 4) {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(videoFile);
     video.preload = 'metadata';
-    video.src = URL.createObjectURL(videoFile);
+    video.src = objectUrl;
     video.muted = true;
     video.playsInline = true;
 
     video.onloadedmetadata = async () => {
       try {
-        const duration = video.duration || 1;
-        const width = video.videoWidth || 640;
-        const height = video.videoHeight || 480;
+        const duration = Number(video.duration);
+        if (!Number.isFinite(duration) || duration <= 0) {
+          throw new Error('De videoduur kon niet worden bepaald.');
+        }
+
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        if (!width || !height) {
+          throw new Error('De video heeft geen geldige afmetingen.');
+        }
 
         const canvas = document.createElement('canvas');
         canvas.width = Math.min(width, 800);
@@ -3485,43 +3557,44 @@ export async function extractVideoKeyframes(videoFile, numFrames = 4) {
 
         for (let i = 1; i <= numFrames; i++) {
           const time = interval * i;
-          await new Promise(res => {
-            video.currentTime = time;
-            video.onseeked = () => {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-              const base64Data = dataUrl.split(',')[1];
-              frames.push(base64Data);
-              res();
-            };
-          });
+          await seekVideo(video, time, 8000);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          frames.push(dataUrl.split(',')[1]);
         }
 
-        URL.revokeObjectURL(video.src);
         resolve(frames);
       } catch (err) {
-        URL.revokeObjectURL(video.src);
         reject(err);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
       }
     };
 
     video.onerror = () => {
-      URL.revokeObjectURL(video.src);
+      URL.revokeObjectURL(objectUrl);
       reject(new Error('Fout bij het laden van het videobestand in de browser.'));
     };
   });
 }
 
-export async function extractImageBase64(imageFile) {
+export async function extractImagePayload(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result;
-      const base64Data = dataUrl.split(',')[1];
-      resolve(base64Data);
+      const result = String(reader.result);
+      const separatorIndex = result.indexOf(',');
+      if (separatorIndex < 0) {
+        reject(new Error('Ongeldige afbeeldingsdata.'));
+        return;
+      }
+      resolve({
+        mimeType: file.type || 'image/jpeg',
+        data: result.slice(separatorIndex + 1)
+      });
     };
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(imageFile);
+    reader.onerror = err => reject(err);
+    reader.readAsDataURL(file);
   });
 }
 
@@ -3555,15 +3628,20 @@ export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening'
   }
 
   const { isImage, isVideo } = validateFormCheckFile(file);
-  let frames = [];
+  let inlineParts = [];
 
   if (isVideo) {
     if (onProgress) onProgress('Video keyframes verwerken...', 30);
-    frames = await extractVideoKeyframes(file, 4);
+    const frames = await extractVideoKeyframes(file, 4);
+    inlineParts = frames.map(f => ({
+      inlineData: { mimeType: 'image/jpeg', data: f }
+    }));
   } else if (isImage) {
     if (onProgress) onProgress('Afbeelding verwerken...', 50);
-    const b64 = await extractImageBase64(file);
-    frames = [b64];
+    const imgPayload = await extractImagePayload(file);
+    inlineParts = [{
+      inlineData: imgPayload
+    }];
   }
 
   if (onProgress) onProgress('Anatomische analyse uitvoeren via Kiné Gemini Multimodal Cloud...', 70);
@@ -3584,13 +3662,6 @@ Analyseer de geüploade beelden van de oefening ("${exerciseName}"). Geef een he
 🧘 **Mogelijk Zichtbare Uitlijning**: Wat valt op aan de positie op basis van deze beelden?
 ⚠️ **Aandachtspunten**: Waar zit mogelijke compensatie (bijv. bekken, schouders, wervelkolom)?
 💡 **3 Bewegingstips**: Geef 3 algemene tips om de controle te verbeteren.`;
-
-  const inlineParts = frames.map(f => ({
-    inlineData: {
-      mimeType: 'image/jpeg',
-      data: f
-    }
-  }));
 
   const targetEndpoint = AI_PROXY_URL 
     ? AI_PROXY_URL 
@@ -3668,6 +3739,49 @@ const DEFAULT_PROFILE = {
   schemaVersion: 1,
 };
 
+export function parseLocalISODate(dateString) {
+  if (!dateString || typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return null;
+  }
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function clampInteger(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+export function normalizeProfile(input = {}) {
+  return {
+    ...DEFAULT_PROFILE,
+    name: typeof input.name === 'string' ? input.name.trim().slice(0, 50) : '',
+    goals: Array.isArray(input.goals) 
+      ? input.goals.filter(g => ['alles', 'core', 'rug', 'benen-billen'].includes(g)) 
+      : ['alles'],
+    dailyMinutes: [10, 15, 20].includes(Number(input.dailyMinutes)) ? Number(input.dailyMinutes) : 15,
+    daysPerWeek: clampInteger(input.daysPerWeek, 1, 7, 6),
+    theme: ['auto', 'light', 'dark'].includes(input.theme) ? input.theme : 'auto',
+    language: ['nl', 'en'].includes(input.language) ? input.language : 'nl',
+    startDate: parseLocalISODate(input.startDate) ? input.startDate : formatDate(new Date()),
+    baseLevels: {
+      'core': clampInteger(input.baseLevels?.['core'], 0, 8, 1),
+      'benen-billen': clampInteger(input.baseLevels?.['benen-billen'], 0, 8, 1),
+      'rug-houding': clampInteger(input.baseLevels?.['rug-houding'], 0, 8, 1),
+    },
+    includeStretch: input.includeStretch !== false,
+    onboardingComplete: input.onboardingComplete === true,
+    schemaVersion: 2
+  };
+}
+
 /**
  * Get the user profile. Returns null if onboarding not complete.
  */
@@ -3681,25 +3795,7 @@ export function getProfile() {
       console.error('Failed to parse profile', e);
       return null;
     }
-    const profile = { ...DEFAULT_PROFILE, ...parsed };
-    
-    // Migrate old baseLevel to new baseLevels if necessary
-    if (parsed.baseLevel !== undefined && !parsed.baseLevels) {
-      profile.baseLevels = {
-        'core': parsed.baseLevel,
-        'benen-billen': parsed.baseLevel,
-        'rug-houding': parsed.baseLevel
-      };
-      delete profile.baseLevel;
-      saveProfile(profile);
-    } else {
-      // Deep-merge baseLevels: ensure all section keys exist with correct values
-      profile.baseLevels = {
-        ...DEFAULT_PROFILE.baseLevels,
-        ...(parsed.baseLevels || {})
-      };
-    }
-    return profile;
+    return normalizeProfile(parsed);
   }
   return null;
 }
@@ -4147,15 +4243,14 @@ function getWorkoutDayIndex() {
 import { db } from './firebase.js';
 import { getCurrentUser } from './auth.js';
 import { 
-  doc, setDoc, getDoc, getDocs, deleteDoc, 
+  doc, setDoc, getDoc, getDocs, deleteDoc, writeBatch,
   collection, arrayUnion, serverTimestamp 
 } from 'firebase/firestore';
 
 /**
- * Handle a new user login: merge their local profile/progress into Firestore
- * and process any pending invites.
+ * Initialize or update user document in Firestore on login.
  */
-export async function initializeSocialUser(localProfile, localTotal, localWeek, localMissed) {
+export async function initializeSocialUser(localProfile, localTotal = 0, localWeek = 1, localMissed = 0) {
   try {
     const user = getCurrentUser();
     if (!user) return;
@@ -4165,14 +4260,7 @@ export async function initializeSocialUser(localProfile, localTotal, localWeek, 
 
     let communities = ['global'];
 
-    // Check for pending invite
-    const pendingInvite = localStorage.getItem('pilates_pending_invite');
-
     if (!userSnap.exists()) {
-      // New user
-      if (pendingInvite) {
-        communities.push(pendingInvite);
-      }
       await setDoc(userRef, {
         name: localProfile.name || user.displayName || 'Pilates Fan',
         totalWorkouts: localTotal || 0,
@@ -4182,12 +4270,8 @@ export async function initializeSocialUser(localProfile, localTotal, localWeek, 
         lastActive: serverTimestamp()
       });
     } else {
-      // Existing user
       const data = userSnap.data();
       communities = data.communities || ['global'];
-      if (pendingInvite && !communities.includes(pendingInvite)) {
-        communities.push(pendingInvite);
-      }
       await setDoc(userRef, {
         name: localProfile.name || data.name || user.displayName || 'Pilates Fan',
         totalWorkouts: Math.max(localTotal, data.totalWorkouts || 0),
@@ -4198,21 +4282,14 @@ export async function initializeSocialUser(localProfile, localTotal, localWeek, 
       }, { merge: true });
     }
 
-    // Clear pending invite
-    if (pendingInvite) {
-      localStorage.removeItem('pilates_pending_invite');
-    }
-
     return communities;
   } catch (error) {
-    console.error("Error initializing user:", error);
-    import('../ui/core.js').then(module => module.showToast('Kan niet verbinden met de server.', 'error'));
-    return ['global'];
+    console.error("Error initializing social user:", error);
   }
 }
 
 /**
- * Push the current user's progress to Firestore.
+ * Push the current user's progress to Firestore atomically across user and community member documents.
  */
 export async function pushUserProgress(data) {
   const user = getCurrentUser();
@@ -4220,45 +4297,60 @@ export async function pushUserProgress(data) {
 
   try {
     const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
-
     const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      name: displayName || 'Pilates Fan',
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    batch.set(userRef, {
+      name: displayName,
       totalWorkouts: data.totalWorkouts || 0,
       currentWeek: data.currentWeek || 1,
       missedWorkouts: data.missedWorkouts || 0,
       lastActive: serverTimestamp()
     }, { merge: true });
 
-    // Sync to community members for public leaderboard
-    const userSnap = await getDoc(userRef);
-    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
-
     for (const commCode of communities) {
       const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
-      await setDoc(memberRef, {
-        displayName: displayName || 'Pilates Fan',
+      batch.set(memberRef, {
+        displayName: displayName,
         score: data.totalWorkouts || 0,
         currentWeek: data.currentWeek || 1,
         lastActive: serverTimestamp()
       }, { merge: true });
     }
+
+    await batch.commit();
   } catch (error) {
-    console.error("Error pushing progress:", error);
+    console.error("Error pushing progress in batch:", error);
+    throw error;
   }
 }
 
 /**
- * Reset cloud progress for authenticated user.
+ * Reset cloud progress for authenticated user, deleting user document and all community member entries atomically.
  */
 export async function resetCloudProgress() {
   try {
     const user = getCurrentUser();
     if (!user) return;
+
     const userRef = doc(db, 'users', user.uid);
-    await deleteDoc(userRef);
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      batch.delete(memberRef);
+    }
+
+    batch.delete(userRef);
+    await batch.commit();
   } catch (error) {
-    console.warn("Could not delete cloud user document:", error);
+    console.warn("Could not delete cloud user documents:", error);
   }
 }
 
@@ -4869,6 +4961,10 @@ import { BleClient } from '@capacitor-community/bluetooth-le';
 const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
 
+export function isPlausibleHeartRate(value) {
+  return Number.isInteger(value) && value >= 30 && value <= 240;
+}
+
 /**
  * Connects to a Bluetooth Low Energy Heart Rate Monitor.
  * Requests the user to select a device broadcasting the Heart Rate Service.
@@ -4912,7 +5008,11 @@ export async function connectHeartRateMonitor(onHeartRateUpdate, onDisconnect) {
           heartRate = value.getUint8(1);
         }
         
-        onHeartRateUpdate(heartRate);
+        if (isPlausibleHeartRate(heartRate)) {
+          onHeartRateUpdate(heartRate);
+        } else {
+          console.warn('Ignoring implausible BPM:', heartRate);
+        }
       }
     );
     
@@ -5028,6 +5128,43 @@ export function escapeHTML(str) {
     .replace(/'/g, "&#039;");
 }
 
+function activateDialogAccessibility(overlay, dialog) {
+  const previousFocus = document.activeElement;
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+
+  const focusable = dialog.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  setTimeout(() => first?.focus(), 50);
+
+  function handleKeydown(event) {
+    if (event.key === 'Escape') {
+      close();
+      return;
+    }
+    if (event.key === 'Tab' && focusable.length > 0) {
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+  }
+
+  function close() {
+    document.removeEventListener('keydown', handleKeydown);
+    overlay.remove();
+    previousFocus?.focus?.();
+  }
+
+  document.addEventListener('keydown', handleKeydown);
+  return close;
+}
+
 export function showDialog(title, message, confirmText, cancelText, onConfirm) {
   const overlay = document.createElement('div');
   overlay.className = 'dialog-overlay';
@@ -5042,11 +5179,15 @@ export function showDialog(title, message, confirmText, cancelText, onConfirm) {
     </div>
   `;
   document.body.appendChild(overlay);
+
+  const dialog = overlay.querySelector('.dialog');
+  const closeDialog = activateDialogAccessibility(overlay, dialog);
+
   if (cancelText) {
-    document.getElementById('dialog-cancel').addEventListener('click', () => overlay.remove());
+    document.getElementById('dialog-cancel').addEventListener('click', () => closeDialog());
   }
-  document.getElementById('dialog-confirm').addEventListener('click', () => { overlay.remove(); onConfirm(); });
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('dialog-confirm').addEventListener('click', () => { closeDialog(); if (onConfirm) onConfirm(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
 }
 
 export function showPrompt(title, message, confirmText, cancelText, onConfirm) {
@@ -5066,27 +5207,28 @@ export function showPrompt(title, message, confirmText, cancelText, onConfirm) {
   document.body.appendChild(overlay);
   
   const input = document.getElementById('dialog-input');
-  input.focus();
+  const dialog = overlay.querySelector('.dialog');
+  const closeDialog = activateDialogAccessibility(overlay, dialog);
   
   if (cancelText) {
-    document.getElementById('dialog-cancel').addEventListener('click', () => overlay.remove());
+    document.getElementById('dialog-cancel').addEventListener('click', () => closeDialog());
   }
   
   document.getElementById('dialog-confirm').addEventListener('click', () => { 
     const val = input.value;
-    overlay.remove(); 
-    onConfirm(val); 
+    closeDialog(); 
+    if (onConfirm) onConfirm(val); 
   });
   
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const val = input.value;
-      overlay.remove(); 
-      onConfirm(val);
+      closeDialog(); 
+      if (onConfirm) onConfirm(val);
     }
   });
   
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
 }
 export function showToast(message, type = 'info') {
   const toast = document.createElement('div');
@@ -5871,7 +6013,7 @@ export function getWorkoutCompletionResult() {
   };
 }
 
-function nextStep() {
+async function nextStep() {
   clearTimerInterval();
 
   const steps = state.workoutSteps;
@@ -5905,7 +6047,7 @@ function nextStep() {
     const focus = state.todayFocus;
     markTodayComplete(focus ? focus.focusEmoji : '✓');
     
-    // Push score to Firebase immediately upon completion (only once!)
+    // Push score to Firebase immediately upon completion
     const profile = getProfile();
     if (profile) {
       const progressData = {
@@ -5914,8 +6056,12 @@ function nextStep() {
         missedWorkouts: getMissedWorkouts(),
         currentWeek: getCurrentWeek()
       };
-      console.log('[Workout] Pushing progress to Firebase:', progressData);
-      pushUserProgress(progressData);
+      try {
+        await pushUserProgress(progressData);
+      } catch (err) {
+        console.warn('Cloud sync error on completion:', err);
+        showToast('Workout lokaal opgeslagen. Cloudsync volgt later.', 'info');
+      }
     }
     state.screen = 'complete';
     render();

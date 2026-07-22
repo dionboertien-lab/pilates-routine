@@ -60,6 +60,43 @@ export function escapeHTML(str) {
     .replace(/'/g, "&#039;");
 }
 
+function activateDialogAccessibility(overlay, dialog) {
+  const previousFocus = document.activeElement;
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+
+  const focusable = dialog.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  setTimeout(() => first?.focus(), 50);
+
+  function handleKeydown(event) {
+    if (event.key === 'Escape') {
+      close();
+      return;
+    }
+    if (event.key === 'Tab' && focusable.length > 0) {
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+  }
+
+  function close() {
+    document.removeEventListener('keydown', handleKeydown);
+    overlay.remove();
+    previousFocus?.focus?.();
+  }
+
+  document.addEventListener('keydown', handleKeydown);
+  return close;
+}
+
 export function showDialog(title, message, confirmText, cancelText, onConfirm) {
   const overlay = document.createElement('div');
   overlay.className = 'dialog-overlay';
@@ -74,11 +111,15 @@ export function showDialog(title, message, confirmText, cancelText, onConfirm) {
     </div>
   `;
   document.body.appendChild(overlay);
+
+  const dialog = overlay.querySelector('.dialog');
+  const closeDialog = activateDialogAccessibility(overlay, dialog);
+
   if (cancelText) {
-    document.getElementById('dialog-cancel').addEventListener('click', () => overlay.remove());
+    document.getElementById('dialog-cancel').addEventListener('click', () => closeDialog());
   }
-  document.getElementById('dialog-confirm').addEventListener('click', () => { overlay.remove(); onConfirm(); });
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('dialog-confirm').addEventListener('click', () => { closeDialog(); if (onConfirm) onConfirm(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
 }
 
 export function showPrompt(title, message, confirmText, cancelText, onConfirm) {
@@ -98,27 +139,28 @@ export function showPrompt(title, message, confirmText, cancelText, onConfirm) {
   document.body.appendChild(overlay);
   
   const input = document.getElementById('dialog-input');
-  input.focus();
+  const dialog = overlay.querySelector('.dialog');
+  const closeDialog = activateDialogAccessibility(overlay, dialog);
   
   if (cancelText) {
-    document.getElementById('dialog-cancel').addEventListener('click', () => overlay.remove());
+    document.getElementById('dialog-cancel').addEventListener('click', () => closeDialog());
   }
   
   document.getElementById('dialog-confirm').addEventListener('click', () => { 
     const val = input.value;
-    overlay.remove(); 
-    onConfirm(val); 
+    closeDialog(); 
+    if (onConfirm) onConfirm(val); 
   });
   
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const val = input.value;
-      overlay.remove(); 
-      onConfirm(val);
+      closeDialog(); 
+      if (onConfirm) onConfirm(val);
     }
   });
   
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(); });
 }
 export function showToast(message, type = 'info') {
   const toast = document.createElement('div');

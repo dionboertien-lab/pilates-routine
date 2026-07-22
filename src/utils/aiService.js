@@ -228,19 +228,56 @@ export async function generateAIResponse({ prompt, history = [], systemInstructi
   }
 }
 
+function seekVideo(video, time, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Video-seek duurde te lang.'));
+    }, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('error', handleError);
+    }
+
+    function handleSeeked() {
+      cleanup();
+      resolve();
+    }
+
+    function handleError() {
+      cleanup();
+      reject(new Error('Video-frame kon niet geladen worden.'));
+    }
+
+    video.addEventListener('seeked', handleSeeked, { once: true });
+    video.addEventListener('error', handleError, { once: true });
+    video.currentTime = time;
+  });
+}
+
 export async function extractVideoKeyframes(videoFile, numFrames = 4) {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(videoFile);
     video.preload = 'metadata';
-    video.src = URL.createObjectURL(videoFile);
+    video.src = objectUrl;
     video.muted = true;
     video.playsInline = true;
 
     video.onloadedmetadata = async () => {
       try {
-        const duration = video.duration || 1;
-        const width = video.videoWidth || 640;
-        const height = video.videoHeight || 480;
+        const duration = Number(video.duration);
+        if (!Number.isFinite(duration) || duration <= 0) {
+          throw new Error('De videoduur kon niet worden bepaald.');
+        }
+
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        if (!width || !height) {
+          throw new Error('De video heeft geen geldige afmetingen.');
+        }
 
         const canvas = document.createElement('canvas');
         canvas.width = Math.min(width, 800);
@@ -252,43 +289,44 @@ export async function extractVideoKeyframes(videoFile, numFrames = 4) {
 
         for (let i = 1; i <= numFrames; i++) {
           const time = interval * i;
-          await new Promise(res => {
-            video.currentTime = time;
-            video.onseeked = () => {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-              const base64Data = dataUrl.split(',')[1];
-              frames.push(base64Data);
-              res();
-            };
-          });
+          await seekVideo(video, time, 8000);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          frames.push(dataUrl.split(',')[1]);
         }
 
-        URL.revokeObjectURL(video.src);
         resolve(frames);
       } catch (err) {
-        URL.revokeObjectURL(video.src);
         reject(err);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
       }
     };
 
     video.onerror = () => {
-      URL.revokeObjectURL(video.src);
+      URL.revokeObjectURL(objectUrl);
       reject(new Error('Fout bij het laden van het videobestand in de browser.'));
     };
   });
 }
 
-export async function extractImageBase64(imageFile) {
+export async function extractImagePayload(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result;
-      const base64Data = dataUrl.split(',')[1];
-      resolve(base64Data);
+      const result = String(reader.result);
+      const separatorIndex = result.indexOf(',');
+      if (separatorIndex < 0) {
+        reject(new Error('Ongeldige afbeeldingsdata.'));
+        return;
+      }
+      resolve({
+        mimeType: file.type || 'image/jpeg',
+        data: result.slice(separatorIndex + 1)
+      });
     };
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(imageFile);
+    reader.onerror = err => reject(err);
+    reader.readAsDataURL(file);
   });
 }
 
@@ -322,15 +360,20 @@ export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening'
   }
 
   const { isImage, isVideo } = validateFormCheckFile(file);
-  let frames = [];
+  let inlineParts = [];
 
   if (isVideo) {
     if (onProgress) onProgress('Video keyframes verwerken...', 30);
-    frames = await extractVideoKeyframes(file, 4);
+    const frames = await extractVideoKeyframes(file, 4);
+    inlineParts = frames.map(f => ({
+      inlineData: { mimeType: 'image/jpeg', data: f }
+    }));
   } else if (isImage) {
     if (onProgress) onProgress('Afbeelding verwerken...', 50);
-    const b64 = await extractImageBase64(file);
-    frames = [b64];
+    const imgPayload = await extractImagePayload(file);
+    inlineParts = [{
+      inlineData: imgPayload
+    }];
   }
 
   if (onProgress) onProgress('Anatomische analyse uitvoeren via Kiné Gemini Multimodal Cloud...', 70);
@@ -351,13 +394,6 @@ Analyseer de geüploade beelden van de oefening ("${exerciseName}"). Geef een he
 🧘 **Mogelijk Zichtbare Uitlijning**: Wat valt op aan de positie op basis van deze beelden?
 ⚠️ **Aandachtspunten**: Waar zit mogelijke compensatie (bijv. bekken, schouders, wervelkolom)?
 💡 **3 Bewegingstips**: Geef 3 algemene tips om de controle te verbeteren.`;
-
-  const inlineParts = frames.map(f => ({
-    inlineData: {
-      mimeType: 'image/jpeg',
-      data: f
-    }
-  }));
 
   const targetEndpoint = AI_PROXY_URL 
     ? AI_PROXY_URL 

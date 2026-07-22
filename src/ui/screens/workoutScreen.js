@@ -476,7 +476,7 @@ export function getWorkoutCompletionResult() {
   };
 }
 
-function nextStep() {
+async function nextStep() {
   clearTimerInterval();
 
   const steps = state.workoutSteps;
@@ -510,7 +510,7 @@ function nextStep() {
     const focus = state.todayFocus;
     markTodayComplete(focus ? focus.focusEmoji : '✓');
     
-    // Push score to Firebase immediately upon completion (only once!)
+    // Push score to Firebase immediately upon completion
     const profile = getProfile();
     if (profile) {
       const progressData = {
@@ -519,8 +519,12 @@ function nextStep() {
         missedWorkouts: getMissedWorkouts(),
         currentWeek: getCurrentWeek()
       };
-      console.log('[Workout] Pushing progress to Firebase:', progressData);
-      pushUserProgress(progressData);
+      try {
+        await pushUserProgress(progressData);
+      } catch (err) {
+        console.warn('Cloud sync error on completion:', err);
+        showToast('Workout lokaal opgeslagen. Cloudsync volgt later.', 'info');
+      }
     }
     state.screen = 'complete';
     render();

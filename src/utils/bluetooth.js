@@ -3,6 +3,10 @@ import { BleClient } from '@capacitor-community/bluetooth-le';
 const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
 
+export function isPlausibleHeartRate(value) {
+  return Number.isInteger(value) && value >= 30 && value <= 240;
+}
+
 /**
  * Connects to a Bluetooth Low Energy Heart Rate Monitor.
  * Requests the user to select a device broadcasting the Heart Rate Service.
@@ -46,7 +50,11 @@ export async function connectHeartRateMonitor(onHeartRateUpdate, onDisconnect) {
           heartRate = value.getUint8(1);
         }
         
-        onHeartRateUpdate(heartRate);
+        if (isPlausibleHeartRate(heartRate)) {
+          onHeartRateUpdate(heartRate);
+        } else {
+          console.warn('Ignoring implausible BPM:', heartRate);
+        }
       }
     );
     

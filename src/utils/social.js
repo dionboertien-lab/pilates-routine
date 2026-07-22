@@ -1,15 +1,14 @@
 import { db } from './firebase.js';
 import { getCurrentUser } from './auth.js';
 import { 
-  doc, setDoc, getDoc, getDocs, deleteDoc, 
+  doc, setDoc, getDoc, getDocs, deleteDoc, writeBatch,
   collection, arrayUnion, serverTimestamp 
 } from 'firebase/firestore';
 
 /**
- * Handle a new user login: merge their local profile/progress into Firestore
- * and process any pending invites.
+ * Initialize or update user document in Firestore on login.
  */
-export async function initializeSocialUser(localProfile, localTotal, localWeek, localMissed) {
+export async function initializeSocialUser(localProfile, localTotal = 0, localWeek = 1, localMissed = 0) {
   try {
     const user = getCurrentUser();
     if (!user) return;
@@ -19,14 +18,7 @@ export async function initializeSocialUser(localProfile, localTotal, localWeek, 
 
     let communities = ['global'];
 
-    // Check for pending invite
-    const pendingInvite = localStorage.getItem('pilates_pending_invite');
-
     if (!userSnap.exists()) {
-      // New user
-      if (pendingInvite) {
-        communities.push(pendingInvite);
-      }
       await setDoc(userRef, {
         name: localProfile.name || user.displayName || 'Pilates Fan',
         totalWorkouts: localTotal || 0,
@@ -36,12 +28,8 @@ export async function initializeSocialUser(localProfile, localTotal, localWeek, 
         lastActive: serverTimestamp()
       });
     } else {
-      // Existing user
       const data = userSnap.data();
       communities = data.communities || ['global'];
-      if (pendingInvite && !communities.includes(pendingInvite)) {
-        communities.push(pendingInvite);
-      }
       await setDoc(userRef, {
         name: localProfile.name || data.name || user.displayName || 'Pilates Fan',
         totalWorkouts: Math.max(localTotal, data.totalWorkouts || 0),
@@ -52,21 +40,14 @@ export async function initializeSocialUser(localProfile, localTotal, localWeek, 
       }, { merge: true });
     }
 
-    // Clear pending invite
-    if (pendingInvite) {
-      localStorage.removeItem('pilates_pending_invite');
-    }
-
     return communities;
   } catch (error) {
-    console.error("Error initializing user:", error);
-    import('../ui/core.js').then(module => module.showToast('Kan niet verbinden met de server.', 'error'));
-    return ['global'];
+    console.error("Error initializing social user:", error);
   }
 }
 
 /**
- * Push the current user's progress to Firestore.
+ * Push the current user's progress to Firestore atomically across user and community member documents.
  */
 export async function pushUserProgress(data) {
   const user = getCurrentUser();
@@ -74,45 +55,60 @@ export async function pushUserProgress(data) {
 
   try {
     const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
-
     const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      name: displayName || 'Pilates Fan',
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    batch.set(userRef, {
+      name: displayName,
       totalWorkouts: data.totalWorkouts || 0,
       currentWeek: data.currentWeek || 1,
       missedWorkouts: data.missedWorkouts || 0,
       lastActive: serverTimestamp()
     }, { merge: true });
 
-    // Sync to community members for public leaderboard
-    const userSnap = await getDoc(userRef);
-    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
-
     for (const commCode of communities) {
       const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
-      await setDoc(memberRef, {
-        displayName: displayName || 'Pilates Fan',
+      batch.set(memberRef, {
+        displayName: displayName,
         score: data.totalWorkouts || 0,
         currentWeek: data.currentWeek || 1,
         lastActive: serverTimestamp()
       }, { merge: true });
     }
+
+    await batch.commit();
   } catch (error) {
-    console.error("Error pushing progress:", error);
+    console.error("Error pushing progress in batch:", error);
+    throw error;
   }
 }
 
 /**
- * Reset cloud progress for authenticated user.
+ * Reset cloud progress for authenticated user, deleting user document and all community member entries atomically.
  */
 export async function resetCloudProgress() {
   try {
     const user = getCurrentUser();
     if (!user) return;
+
     const userRef = doc(db, 'users', user.uid);
-    await deleteDoc(userRef);
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      batch.delete(memberRef);
+    }
+
+    batch.delete(userRef);
+    await batch.commit();
   } catch (error) {
-    console.warn("Could not delete cloud user document:", error);
+    console.warn("Could not delete cloud user documents:", error);
   }
 }
 
