@@ -9,12 +9,6 @@ export function renderSettings() {
   const profile = getProfile() || {};
   const lang = getLanguage();
   const theme = profile.theme || 'auto';
-  
-  const genders = [
-    { id: 'female', emoji: '👩', label: t('ob.gender.f') },
-    { id: 'male', emoji: '👨', label: t('ob.gender.m') },
-    { id: 'neutral', emoji: '🧑', label: t('ob.gender.n') },
-  ];
 
   app.innerHTML = `
     <div class="screen settings">
@@ -96,20 +90,12 @@ export function renderSettings() {
       </div>
 
 
-      <div class="settings__row">
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('set.gender')}</label>
-          <select class="settings__select" id="set-gender">
-            ${genders.map(g => `<option value="${g.id}" ${profile.gender === g.id ? 'selected' : ''}>${g.emoji} ${g.label}</option>`).join('')}
-          </select>
-        </div>
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('set.stretch')}</label>
-          <select class="settings__select" id="set-stretch">
-            <option value="true" ${profile.includeStretch !== false ? 'selected' : ''}>✅ ${lang === 'nl' ? 'Ja' : 'Yes'}</option>
-            <option value="false" ${profile.includeStretch === false ? 'selected' : ''}>❌ ${lang === 'nl' ? 'Nee' : 'No'}</option>
-          </select>
-        </div>
+      <div class="settings__group">
+        <label class="settings__label">${t('set.stretch')}</label>
+        <select class="settings__select" id="set-stretch">
+          <option value="true" ${profile.includeStretch !== false ? 'selected' : ''}>✅ ${lang === 'nl' ? 'Ja' : 'Yes'}</option>
+          <option value="false" ${profile.includeStretch === false ? 'selected' : ''}>❌ ${lang === 'nl' ? 'Nee' : 'No'}</option>
+        </select>
       </div>
 
       <div class="settings__row">
@@ -168,7 +154,6 @@ export function renderSettings() {
     const updatedProfile = {
       ...profile,
       name: document.getElementById('set-name').value.trim() || 'Pilates Fan',
-      gender: document.getElementById('set-gender').value,
       language: document.getElementById('set-language').value,
       theme: document.getElementById('set-theme').value,
       dailyMinutes: parseInt(document.getElementById('set-minutes').value),

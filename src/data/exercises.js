@@ -399,21 +399,18 @@ export function getSection(sectionId) {
   return SECTIONS.find(s => s.id === sectionId);
 }
 
-export function matchesTargetGender(exercise, gender = 'female') {
-  if (!exercise || !exercise.targetGender || exercise.targetGender === 'all') return true;
-  if (gender === 'male') return exercise.targetGender === 'male';
-  if (gender === 'female') return exercise.targetGender === 'female';
-  return exercise.targetGender === 'all';
+export function matchesTargetGender() {
+  return true;
 }
 
 /**
- * Build the workout steps based on goals, current week, baseLevels object, and gender.
+ * Build the workout steps based on goals, current week, and baseLevels object.
  */
-export function buildWorkoutSteps(sectionIds, currentWeek, gender = 'female', baseLevels = {}) {
+export function buildWorkoutSteps(sectionIds, currentWeek, baseLevels = {}) {
   const steps = [];
 
   const filteredExercises = EXERCISES.filter(e => {
-    return sectionIds.includes(e.sectionId) && matchesTargetGender(e, gender);
+    return sectionIds.includes(e.sectionId);
   });
 
   for (const exercise of filteredExercises) {

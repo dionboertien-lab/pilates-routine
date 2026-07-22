@@ -261,20 +261,18 @@ export function startWorkout() {
   const focus = getTodaysFocus();
   const currentWeek = getCurrentWeek();
   const profile = getProfile();
-  const gender = profile ? profile.gender : 'female';
   const baseLevels = profile ? (profile.baseLevels || {}) : {};
 
   // Debug logging for level issues
   console.log('[Workout] Starting workout:', {
     currentWeek,
-    gender,
     baseLevels,
     focusSections: focus.sectionIds
   });
 
   state.screen = 'workout';
   state.todayFocus = focus;
-  state.workoutSteps = buildWorkoutSteps(focus.sectionIds, currentWeek, gender, baseLevels);
+  state.workoutSteps = buildWorkoutSteps(focus.sectionIds, currentWeek, baseLevels);
   state.currentStepIndex = 0;
   state.exerciseComplete = false;
   state.showingSectionIntro = true;

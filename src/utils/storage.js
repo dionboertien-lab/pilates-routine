@@ -20,7 +20,6 @@ const STORAGE_KEYS = {
  */
 const DEFAULT_PROFILE = {
   name: '',
-  gender: 'female',       // 'female', 'male', 'neutral'
   goals: ['alles'],       // ['billen-benen', 'core', 'rug', 'alles']
   dailyMinutes: 15,       // 10, 15, 20
   daysPerWeek: 6,         // 3, 4, 5, 6

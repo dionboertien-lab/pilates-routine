@@ -3180,21 +3180,18 @@ export function getSection(sectionId) {
   return SECTIONS.find(s => s.id === sectionId);
 }
 
-export function matchesTargetGender(exercise, gender = 'female') {
-  if (!exercise || !exercise.targetGender || exercise.targetGender === 'all') return true;
-  if (gender === 'male') return exercise.targetGender === 'male';
-  if (gender === 'female') return exercise.targetGender === 'female';
-  return exercise.targetGender === 'all';
+export function matchesTargetGender() {
+  return true;
 }
 
 /**
- * Build the workout steps based on goals, current week, baseLevels object, and gender.
+ * Build the workout steps based on goals, current week, and baseLevels object.
  */
-export function buildWorkoutSteps(sectionIds, currentWeek, gender = 'female', baseLevels = {}) {
+export function buildWorkoutSteps(sectionIds, currentWeek, baseLevels = {}) {
   const steps = [];
 
   const filteredExercises = EXERCISES.filter(e => {
-    return sectionIds.includes(e.sectionId) && matchesTargetGender(e, gender);
+    return sectionIds.includes(e.sectionId);
   });
 
   for (const exercise of filteredExercises) {
@@ -3657,7 +3654,6 @@ const STORAGE_KEYS = {
  */
 const DEFAULT_PROFILE = {
   name: '',
-  gender: 'female',       // 'female', 'male', 'neutral'
   goals: ['alles'],       // ['billen-benen', 'core', 'rug', 'alles']
   dailyMinutes: 15,       // 10, 15, 20
   daysPerWeek: 6,         // 3, 4, 5, 6
@@ -5660,20 +5656,18 @@ export function startWorkout() {
   const focus = getTodaysFocus();
   const currentWeek = getCurrentWeek();
   const profile = getProfile();
-  const gender = profile ? profile.gender : 'female';
   const baseLevels = profile ? (profile.baseLevels || {}) : {};
 
   // Debug logging for level issues
   console.log('[Workout] Starting workout:', {
     currentWeek,
-    gender,
     baseLevels,
     focusSections: focus.sectionIds
   });
 
   state.screen = 'workout';
   state.todayFocus = focus;
-  state.workoutSteps = buildWorkoutSteps(focus.sectionIds, currentWeek, gender, baseLevels);
+  state.workoutSteps = buildWorkoutSteps(focus.sectionIds, currentWeek, baseLevels);
   state.currentStepIndex = 0;
   state.exerciseComplete = false;
   state.showingSectionIntro = true;
@@ -6708,15 +6702,14 @@ import { t, getLanguage } from '../../utils/i18n.js';
 
 export function renderOnboarding() {
   const step = state.onboardingStep || 0;
-  const data = state.onboardingData || { name: '', gender: 'female', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: formatDate(new Date()), baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } };
+  const data = state.onboardingData || { name: '', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: formatDate(new Date()), baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } };
   state.onboardingData = data;
 
   const steps = [
-    renderStep0,
-    renderStep1,
-    renderStep2, // previously 3 (levels)
-    renderStep3, // previously 4 (time)
-    renderStep4, // previously 5 (start date)
+    renderStep0, // name
+    renderStep2, // level
+    renderStep3, // time & days
+    renderStep4, // start date
   ];
 
   app.innerHTML = `
@@ -6747,18 +6740,6 @@ function renderStep0() {
     <div class="onboarding__group">
       <label class="onboarding__label">${t('ob.name.label')}</label>
       <input type="text" class="onboarding__input" id="ob-name" placeholder="${t('ob.name.placeholder')}" value="${escapeHTML(state.onboardingData.name)}" autofocus>
-    </div>
-  `;
-}
-
-function renderStep1() {
-  return `
-    <h2 class="onboarding__title">${t('ob.gender.title')}</h2>
-    <p class="onboarding__subtitle">${t('ob.gender.sub')}</p>
-    <div class="onboarding__options" id="ob-gender-options">
-      ${renderOption('gender', 'female', '👩', t('ob.gender.f'), state.onboardingData.gender === 'female')}
-      ${renderOption('gender', 'male', '👨', t('ob.gender.m'), state.onboardingData.gender === 'male')}
-      ${renderOption('gender', 'neutral', '🧑', t('ob.gender.n'), state.onboardingData.gender === 'neutral')}
     </div>
   `;
 }
@@ -6859,11 +6840,10 @@ function renderOption(type, value, emoji, label, isSelected) {
 
 function canProceed(step, data) {
   if (step === 0 && !data.name.trim()) return false;
-  if (step === 1 && !data.gender) return false;
   return true;
 }
 
-function attachOnboardingListeners(step, totalSteps = 5) {
+function attachOnboardingListeners(step, totalSteps = 4) {
   const prevBtn = document.getElementById('ob-prev');
   const nextBtn = document.getElementById('ob-next');
 
@@ -6893,14 +6873,7 @@ function attachOnboardingListeners(step, totalSteps = 5) {
       state.onboardingData.name = input.value;
       nextBtn.disabled = !canProceed(0, state.onboardingData);
     });
-  } else if (step === 1) {
-    document.querySelectorAll('#ob-gender-options .onboarding__option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.onboardingData.gender = btn.dataset.gender;
-        render();
-      });
-    });
-  } else if (step === 3) {
+  } else if (step === 2) {
     document.querySelectorAll('#ob-min-options .onboarding__option').forEach(btn => {
       btn.addEventListener('click', () => {
         state.onboardingData.dailyMinutes = parseInt(btn.dataset.min);
@@ -6958,12 +6931,6 @@ export function renderSettings() {
   const profile = getProfile() || {};
   const lang = getLanguage();
   const theme = profile.theme || 'auto';
-  
-  const genders = [
-    { id: 'female', emoji: '👩', label: t('ob.gender.f') },
-    { id: 'male', emoji: '👨', label: t('ob.gender.m') },
-    { id: 'neutral', emoji: '🧑', label: t('ob.gender.n') },
-  ];
 
   app.innerHTML = `
     <div class="screen settings">
@@ -7045,20 +7012,12 @@ export function renderSettings() {
       </div>
 
 
-      <div class="settings__row">
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('set.gender')}</label>
-          <select class="settings__select" id="set-gender">
-            ${genders.map(g => `<option value="${g.id}" ${profile.gender === g.id ? 'selected' : ''}>${g.emoji} ${g.label}</option>`).join('')}
-          </select>
-        </div>
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('set.stretch')}</label>
-          <select class="settings__select" id="set-stretch">
-            <option value="true" ${profile.includeStretch !== false ? 'selected' : ''}>✅ ${lang === 'nl' ? 'Ja' : 'Yes'}</option>
-            <option value="false" ${profile.includeStretch === false ? 'selected' : ''}>❌ ${lang === 'nl' ? 'Nee' : 'No'}</option>
-          </select>
-        </div>
+      <div class="settings__group">
+        <label class="settings__label">${t('set.stretch')}</label>
+        <select class="settings__select" id="set-stretch">
+          <option value="true" ${profile.includeStretch !== false ? 'selected' : ''}>✅ ${lang === 'nl' ? 'Ja' : 'Yes'}</option>
+          <option value="false" ${profile.includeStretch === false ? 'selected' : ''}>❌ ${lang === 'nl' ? 'Nee' : 'No'}</option>
+        </select>
       </div>
 
       <div class="settings__row">
@@ -7117,7 +7076,6 @@ export function renderSettings() {
     const updatedProfile = {
       ...profile,
       name: document.getElementById('set-name').value.trim() || 'Pilates Fan',
-      gender: document.getElementById('set-gender').value,
       language: document.getElementById('set-language').value,
       theme: document.getElementById('set-theme').value,
       dailyMinutes: parseInt(document.getElementById('set-minutes').value),
