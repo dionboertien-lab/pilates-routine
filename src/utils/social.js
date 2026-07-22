@@ -82,10 +82,10 @@ export async function pushUserProgress(data) {
       remoteTotal = userSnap.data().totalWorkouts || 0;
     }
     
-    const displayName = data.name && data.name.trim() !== '' ? data.name.trim() : 'Pilates Fan';
+    const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
 
     await setDoc(userRef, {
-      name: displayName,
+      name: displayName || 'Pilates Fan',
       totalWorkouts: Math.max(remoteTotal, data.totalWorkouts || 0),
       currentWeek: data.currentWeek || 1,
       missedWorkouts: data.missedWorkouts || 0,
@@ -145,18 +145,25 @@ export async function getLeaderboard(communityCode = 'global') {
 /**
  * Create a new community
  */
+function sanitizeText(str, maxLen = 40) {
+  if (!str || typeof str !== 'string') return '';
+  return str.replace(/<[^>]*>/g, '').trim().substring(0, maxLen);
+}
+
 export async function createCommunity(name) {
   try {
     const user = getCurrentUser();
     if (!user) throw new Error("Not authenticated");
 
-    // Generate a random 6-character uppercase code
+    const cleanName = sanitizeText(name, 40);
+    if (!cleanName) throw new Error("Ongeldige groepsnaam.");
+
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const commRef = doc(db, 'communities', code);
     await setDoc(commRef, {
       id: code,
-      name: name,
+      name: cleanName,
       ownerId: user.uid,
       createdAt: serverTimestamp()
     });

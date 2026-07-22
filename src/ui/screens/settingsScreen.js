@@ -24,7 +24,7 @@ export function renderSettings() {
 
       <div class="settings__group">
         <label class="settings__label">${t('set.name')}</label>
-        <input class="settings__input" type="text" id="set-name" value="${profile.name || ''}" />
+        <input class="settings__input" type="text" id="set-name" value="${escapeHTML(profile.name || '')}" />
       </div>
 
       <div class="settings__row">

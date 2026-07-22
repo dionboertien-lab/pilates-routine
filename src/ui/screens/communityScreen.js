@@ -126,7 +126,7 @@ function renderCommunity() {
         ${state.loadingLeaderboard ? `<div class="community__loading">${t('comm.loading')}</div>` : `
           ${state.leaderboard.length === 0 ? `<div class="community__empty">${t('comm.empty')}</div>` : `
             ${state.leaderboard.map((user, index) => {
-              const rankColor = index===0 ? '#FFD700' : index===1 ? '#C0C0C0' : index===2 ? '#CD7F32' : 'var(--sage)';
+              const rankColor = index===0 ? 'var(--gold)' : index===1 ? 'var(--silver)' : index===2 ? 'var(--bronze)' : 'var(--sage)';
               return `
               <div class="community__user">
                 <div class="community__rank" style="color: ${rankColor}">${index + 1}</div>

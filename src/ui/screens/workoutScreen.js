@@ -54,7 +54,7 @@ export function renderWorkout() {
         <div class="exercise__header">
           <h2 class="exercise__name">
             ${step.name}
-            ${step.sideName ? `<span class="exercise__side-badge">${step.sideName} ${step.sideLabel ? (step.sideLabel[lang] || step.sideLabel) : ''}</span>` : ''}
+            ${step.sideName ? `<span class="exercise__side-badge">${step.sideName} ${step.sideLabel ? (t('side.' + step.sideLabel) || step.sideLabel) : ''}</span>` : ''}
           </h2>
           <p class="exercise__instruction">${step.instruction[lang] || step.instruction}</p>
         </div>
@@ -140,16 +140,16 @@ async function handleBleConnect() {
 }
 
 function renderExerciseImage(step) {
-  const imgSrc = `/images/${step.image}.webp`;
+  const imgSrc = step && step.image ? `/images/${step.image}.webp` : '';
   return `
     <img
       class="exercise__image"
       src="${imgSrc}"
-      alt="${step.name}"
+      alt="${escapeHTML(step ? step.name : 'Oefening')}"
       onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
     />
     <div class="exercise__image-placeholder" style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-glass); border-radius:var(--radius-md);">
-      ${getExerciseIcon(step.id)}
+      ${getExerciseIcon(step ? step.id : '')}
     </div>
   `;
 }
@@ -291,6 +291,7 @@ export function startWorkout() {
   state.showingSectionIntro = true;
   state.currentSectionId = null;
   state.skippedCount = 0;
+  state.skippedCoreCount = 0;
   state.liveKcal = 0;
   state.liveBpm = 85;
   
@@ -465,7 +466,16 @@ function handleSkip() {
   state.skippedCount++;
   
   const steps = state.workoutSteps;
-  if (state.skippedCount === Math.floor(steps.length / 2)) {
+  const currentStep = steps[state.currentStepIndex];
+  if (currentStep && currentStep.sectionId !== 'warmup' && currentStep.sectionId !== 'stretch') {
+    state.skippedCoreCount = (state.skippedCoreCount || 0) + 1;
+  }
+
+  const coreSteps = steps.filter(s => s.sectionId !== 'warmup' && s.sectionId !== 'stretch');
+  const totalCoreCount = coreSteps.length || 1;
+  const skippedCoreCount = state.skippedCoreCount || 0;
+
+  if (skippedCoreCount === Math.floor(totalCoreCount / 2)) {
     showToast(t('wk.skipWarning'), 'error');
   }
   
@@ -480,7 +490,11 @@ function nextStep() {
   const nextIndex = state.currentStepIndex + 1;
 
   if (nextIndex >= steps.length) {
-    if (state.skippedCount > steps.length / 2) {
+    const coreSteps = steps.filter(s => s.sectionId !== 'warmup' && s.sectionId !== 'stretch');
+    const totalCoreCount = coreSteps.length || 1;
+    const skippedCoreCount = state.skippedCoreCount || 0;
+
+    if (skippedCoreCount > totalCoreCount / 2) {
       showDialog(
         t('wk.notCompleted.title'),
         t('wk.notCompleted.msg'),
