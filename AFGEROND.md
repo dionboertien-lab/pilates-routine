@@ -1,5 +1,15 @@
 # AFGEROND — Pilates Routine
 
+## 2026-07-23 (5e Audit-ronde v1.2.4)
+
+- **Coach Screen Scope Fix**: Event-listeners, `chatRef` en `sendMessage` logica hersteld binnen de correcte scope van `renderCoach()`.
+- **Lege Workout Guard**: `startWorkout()` bevat een expliciete guard wanneer er geen oefeningen beschikbaar zijn.
+- **Niveau 0 Behoud (`??`)**: `|| 1` vervangen door `?? 1` in `exercises.js` en `workoutScreen.js`; uitgeschakelde onderdelen (niveau 0) worden niet meer geforceerd omgezet naar niveau 1.
+- **Firestore Security Rules Hardening**: Strikte `keys().hasOnly()` restricties op `/users`, score-begrenzing (max score 500 bij create/update) op `/communities/members`, en immutable ownerId op `/communities`.
+- **AI Foutafhandeling**: Netwerk/API foutberichten worden lokaal via toasts getoond en niet meer permanent als modelberichten opgeslagen in de Firestore chatgeschiedenis.
+- **Onboarding Step Alignment**: Stap-indexen in `saveStepData()` afgestemd op de 4 onboarding schermen.
+- **PROJECT_SOURCE_CODE.md Clean Export**: Codeblock formatting gecorrigeerd met volwaardige Markdown syntax-fencing.
+
 ## 2026-07-23 (4e Audit-ronde)
 
 - **Niveau 1-8 Progressie**: `getWeekProgression()` vermenigvuldigt `levelMultiplier` (0.75-1.40) × `weekMultiplier` (1.00-1.25). Niveau 8 is nu feitelijk zwaarder dan niveau 1.

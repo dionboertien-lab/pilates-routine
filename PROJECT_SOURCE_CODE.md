@@ -8,7 +8,7 @@ Dit document bevat de complete, ongewijzigde broncode van de Pilates Routine web
 {
   "name": "pilates-routine",
   "private": true,
-  "version": "1.2.3",
+  "version": "1.2.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
