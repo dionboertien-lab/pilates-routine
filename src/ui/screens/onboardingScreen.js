@@ -200,15 +200,22 @@ function attachOnboardingListeners(step, totalSteps = 4) {
 
 function saveStepData(step) {
   if (step === 0) {
-    state.onboardingData.name = document.getElementById('ob-name').value.trim();
-  } else if (step === 2) {
-    state.onboardingData.baseLevels = {
-      core: parseInt(document.getElementById('ob-level-core').value),
-      'benen-billen': parseInt(document.getElementById('ob-level-benen').value),
-      'rug-houding': parseInt(document.getElementById('ob-level-rug').value),
-    };
-  } else if (step === 4) {
-    state.onboardingData.startDate = document.getElementById('ob-start-date').value;
+    const el = document.getElementById('ob-name');
+    if (el) state.onboardingData.name = el.value.trim();
+  } else if (step === 1) {
+    const coreEl = document.getElementById('ob-level-core');
+    const benenEl = document.getElementById('ob-level-benen');
+    const rugEl = document.getElementById('ob-level-rug');
+    if (coreEl && benenEl && rugEl) {
+      state.onboardingData.baseLevels = {
+        core: parseInt(coreEl.value),
+        'benen-billen': parseInt(benenEl.value),
+        'rug-houding': parseInt(rugEl.value),
+      };
+    }
+  } else if (step === 3) {
+    const el = document.getElementById('ob-start-date');
+    if (el) state.onboardingData.startDate = el.value;
   }
 }
 
