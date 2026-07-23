@@ -2,16 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { getWeekProgression, applyProgression, buildWorkoutSteps } from '../src/data/exercises.js';
 
 describe('Exercise Progression & Workout Steps Logic', () => {
-  it('should scale week 1 correctly with gentle multiplier 1.0', () => {
-    const prog = getWeekProgression(1, 1);
-    expect(prog.id).toBe('l1');
+  it('should scale week 1 correctly with gentle multiplier 1.0 at level 4 baseline', () => {
+    const prog = getWeekProgression(1, 4);
+    expect(prog.id).toBe('l4');
     expect(prog.mult).toBe(1.0);
   });
 
-  it('should scale week 8 correctly with gentle multiplier 1.25', () => {
-    const prog = getWeekProgression(8, 1);
-    expect(prog.id).toBe('l1');
+  it('should scale week 8 correctly with gentle multiplier 1.25 at level 4 baseline', () => {
+    const prog = getWeekProgression(8, 4);
+    expect(prog.id).toBe('l4');
     expect(prog.mult).toBe(1.25);
+  });
+
+  it('should scale level 1 week 1 correctly (0.75 x 1.00 = 0.75)', () => {
+    const prog = getWeekProgression(1, 1);
+    expect(prog.id).toBe('l1');
+    expect(prog.mult).toBe(0.75);
   });
 
   it('should cap hold duration at 30 seconds max', () => {

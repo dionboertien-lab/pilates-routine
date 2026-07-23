@@ -1,5 +1,24 @@
 # AFGEROND — Pilates Routine
 
+## 2026-07-23 (4e Audit-ronde)
+
+- **Niveau 1-8 Progressie**: `getWeekProgression()` vermenigvuldigt `levelMultiplier` (0.75-1.40) × `weekMultiplier` (1.00-1.25). Niveau 8 is nu feitelijk zwaarder dan niveau 1.
+- **Firestore Score-begrenzing**: `/communities/{id}/members/{uid}` update-regels eisen `score <= resource.data.score + 1` tegen manipulatie.
+- **Strikte Firestore Veldvalidatie**: `validUserData()` toegevoegd voor `/users/{userId}` en type/lengtevalidatie op `/chats/{chatId}`.
+- **Atomische Cloud Reset**: `resetCloudProgress()` verwijdert in één `writeBatch` zowel het gebruikersdocument als alle community-lidmaatschappen.
+- **Atomische Progressie Push**: `pushUserProgress()` schrijft in één `writeBatch` naar `/users` en `/communities/members`.
+- **Invite Centralisatie**: Community-uitnodigingen worden uitsluitend via `subscribeToAuth` in `main.js` verwerkt.
+- **MIME-Type Behoud**: `extractImagePayload()` behoudt het exacte MIME-type (`image/png`, `image/webp`, `image/jpeg`).
+- **Robuuste Video Seek**: `seekVideo()` met 8s timeout, error handling, `Number.isFinite(duration)` en afmetingsvalidatie.
+- **Tijdzone-veilige Datumparsing**: `parseLocalISODate(dateString)` voorkomt UTC-dagverschuivingen.
+- **Async Workout Completion**: `nextStep()` in `workoutScreen.js` is `async` en `await` de `pushUserProgress` call met foutkoppeling.
+- **Heart-Rate Validatie**: BLE-parser filtert onrealistische hartslagen buiten 30–240 BPM.
+- **Profiel Normalisatie**: `normalizeProfile()` valideert en corrigeert corrupte LocalStorage-invoer.
+- **Dialog Toegankelijkheid**: `activateDialogAccessibility()` met focus trap, `Escape`-toets listener, `role="dialog"` en `aria-modal="true"`.
+- **Geheel Gender-vrij**: Gender is 100% uit de hele app, data, onboarding en instellingen gestript.
+- **ESLint 0 Errors**: Static quality en syntax checks uitgevoerd.
+- **Vitest Unit Tests**: **6/6 tests passed**.
+
 ## 2026-07-22
 
 - **XR.12 — CSS Variabelen voor Rangschikking Kleuren.** `--gold`, `--silver`, `--bronze` gedefinieerd in `style.css` en toegepast in `communityScreen.js`.

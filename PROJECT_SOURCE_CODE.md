@@ -1,9 +1,9 @@
-# Pilates Routine — Volledige Broncode voor ChatGPT Review
+# Pilates Routine — Volledige Broncode voor Review
 
 Dit document bevat de complete broncode van de Pilates Routine web-app.
 
 ## Bestand: package.json
-```json
+`json
 {
   "name": "pilates-routine",
   "private": true,
@@ -38,10 +38,10 @@ Dit document bevat de complete broncode van de Pilates Routine web-app.
   }
 }
 
-```
+`
 
 ## Bestand: firestore.rules
-```js
+`text
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -90,222 +90,39 @@ service cloud.firestore {
   }
 }
 
-```
+`
 
-## Bestand: eslint.config.js
-```js
-export default [
-  {
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'module',
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        localStorage: 'readonly',
-        navigator: 'readonly',
-        fetch: 'readonly',
-        console: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        URL: 'readonly',
-        FileReader: 'readonly',
-        HTMLVideoElement: 'readonly',
-        HTMLCanvasElement: 'readonly',
-        URLSearchParams: 'readonly',
-        File: 'readonly'
-      }
-    },
-    rules: {
-      'no-unused-vars': 'warn',
-      'no-undef': 'error'
-    }
-  }
-];
+## Bestand: index.html
+`html
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="description" content="Pilates Routine — Strakke benen & strakke buik. 8-weken programma, 10-15 minuten per dag." />
+  <meta name="theme-color" content="#8B9E7C" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Kiné" />
+  <meta name="google-signin-client_id" content="443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com" />
+  <title>Kiné</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
 
-```
-
-## Bestand: src/main.js
-```js
-import './style.css';
-import { state } from './state.js';
-import { render } from './ui/core.js';
-import { isOnboardingComplete, getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from './utils/storage.js';
-import { subscribeToAuth } from './utils/auth.js';
-import { getLeaderboard, getUserCommunities, initializeSocialUser, joinCommunity } from './utils/social.js';
-import { StatusBar, Style } from '@capacitor/status-bar';
-
-// Setup auth listener
-subscribeToAuth(async (user) => {
-  state.currentUser = user;
-  state.authLoading = false;
-  if (user) {
-    const profile = getProfile() || {};
-    await initializeSocialUser(profile, getTotalCompleted(), getCurrentWeek(), getMissedWorkouts());
-    
-    const pendingInvite = localStorage.getItem('pilates_pending_invite');
-    if (pendingInvite) {
-      try {
-        await joinCommunity(pendingInvite);
-        localStorage.removeItem('pilates_pending_invite');
-        state.activeCommunity = pendingInvite;
-        const { showToast } = await import('./ui/core.js');
-        showToast(`Lid geworden van groep ${pendingInvite}!`, 'success');
-      } catch (e) {
-        console.warn('Could not join community from invite:', e);
-      }
-    }
-
-    if (state.screen === 'community') {
-      state.loadingLeaderboard = true;
-      render();
-      state.myCommunities = await getUserCommunities();
-      state.leaderboard = await getLeaderboard(state.activeCommunity);
-      state.loadingLeaderboard = false;
-      render();
-    }
-  } else if (state.screen === 'community') {
-    render();
-  }
-});
-
-// Parse invite code from URL on boot
-const urlParams = new URLSearchParams(window.location.search);
-const inviteCode = urlParams.get('invite');
-if (inviteCode) {
-  localStorage.setItem('pilates_pending_invite', inviteCode);
-  // Optional: clear URL
-  window.history.replaceState({}, document.title, window.location.pathname);
-}
-
-// Initial boot
-
-export async function applyTheme() {
-  const profile = getProfile();
-  let theme = profile ? profile.theme : 'auto';
-
-  if (!theme || theme === 'auto') {
-    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
-  if (theme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    try {
-      await StatusBar.setStyle({ style: Style.Dark });
-      await StatusBar.setBackgroundColor({ color: '#1A1C19' });
-    } catch (e) {
-      console.warn('StatusBar not available', e);
-    }
-  } else {
-    document.documentElement.removeAttribute('data-theme');
-    try {
-      await StatusBar.setStyle({ style: Style.Light });
-      await StatusBar.setBackgroundColor({ color: '#F7F2EA' });
-    } catch (e) {
-      console.warn('StatusBar not available', e);
-    }
-  }
-}
-
-// Watch for system theme changes if set to auto
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  const profile = getProfile();
-  if (!profile || !profile.theme || profile.theme === 'auto') {
-    applyTheme();
-  }
-});
-
-applyTheme();
-
-if (isOnboardingComplete()) {
-  state.screen = 'home';
-} else {
-  state.screen = 'onboarding';
-  state.onboardingStep = 0;
-}
-render();
-
-// Service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
-
-import { App as CapacitorApp } from '@capacitor/app';
-import { disconnectHeartRateMonitor } from './utils/bluetooth.js';
-
-CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-  if (state.screen === 'home') {
-    CapacitorApp.exitApp();
-  } else if (state.screen === 'onboarding') {
-    if (state.onboardingStep > 0) {
-      state.onboardingStep--;
-      render();
-    } else {
-      CapacitorApp.exitApp();
-    }
-  } else {
-    if (state.timerInterval) {
-      clearInterval(state.timerInterval);
-      state.timerInterval = null;
-    }
-    if (state.trackerInterval) {
-      clearInterval(state.trackerInterval);
-      state.trackerInterval = null;
-    }
-    if (state.bluetoothDeviceId) {
-      disconnectHeartRateMonitor(state.bluetoothDeviceId);
-      state.bluetoothDeviceId = null;
-    }
-    state.screen = 'home';
-    render();
-  }
-});
-
-```
-
-## Bestand: src/state.js
-```js
-export const state = {
-  screen: 'home', 
-  onboardingStep: 0,
-  onboardingData: { name: '', gender: 'female', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: '' },
-  workoutSteps: [],
-  currentStepIndex: 0,
-  showingSectionIntro: false,
-  currentSectionId: null,
-  todayFocus: null,
-  timerInterval: null,
-  timerRunning: false,
-  timerRemaining: 0,
-  timerTotal: 0,
-  repsRemaining: 0,
-  repsTotal: 0,
-  comboPhase: 'reps',
-  exerciseComplete: false,
-  skippedCount: 0,
-  skippedCoreCount: 0,
-  liveBpm: null,
-  liveKcal: null,
-  bluetoothDeviceId: null,
-  trackerInterval: null,
-  justFinishedWorkout: false,
-  // Social/Auth State
-  currentUser: null,
-  authLoading: true,
-  leaderboard: [],
-  loadingLeaderboard: false,
-  myCommunities: [],
-  activeCommunity: 'global',
-};
-
-```
+`
 
 ## Bestand: src/style.css
-```css
+`css
 /* ═══════════════════════════════════════════════════════════
    PILATES ROUTINE — Design System & Styles
    Inspired by the original exercise sheet's warm, feminine aesthetic
@@ -2790,10 +2607,187 @@ html {
 
 
 
-```
+`
+
+## Bestand: src/main.js
+`javascript
+import './style.css';
+import { state } from './state.js';
+import { render } from './ui/core.js';
+import { isOnboardingComplete, getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from './utils/storage.js';
+import { subscribeToAuth } from './utils/auth.js';
+import { getLeaderboard, getUserCommunities, initializeSocialUser, joinCommunity } from './utils/social.js';
+import { StatusBar, Style } from '@capacitor/status-bar';
+
+// Setup auth listener
+subscribeToAuth(async (user) => {
+  state.currentUser = user;
+  state.authLoading = false;
+  if (user) {
+    const profile = getProfile() || {};
+    await initializeSocialUser(profile, getTotalCompleted(), getCurrentWeek(), getMissedWorkouts());
+    
+    const pendingInvite = localStorage.getItem('pilates_pending_invite');
+    if (pendingInvite) {
+      try {
+        await joinCommunity(pendingInvite);
+        localStorage.removeItem('pilates_pending_invite');
+        state.activeCommunity = pendingInvite;
+        const { showToast } = await import('./ui/core.js');
+        showToast(`Lid geworden van groep ${pendingInvite}!`, 'success');
+      } catch (e) {
+        console.warn('Could not join community from invite:', e);
+      }
+    }
+
+    if (state.screen === 'community') {
+      state.loadingLeaderboard = true;
+      render();
+      state.myCommunities = await getUserCommunities();
+      state.leaderboard = await getLeaderboard(state.activeCommunity);
+      state.loadingLeaderboard = false;
+      render();
+    }
+  } else if (state.screen === 'community') {
+    render();
+  }
+});
+
+// Parse invite code from URL on boot
+const urlParams = new URLSearchParams(window.location.search);
+const inviteCode = urlParams.get('invite');
+if (inviteCode) {
+  localStorage.setItem('pilates_pending_invite', inviteCode);
+  // Optional: clear URL
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+// Initial boot
+
+export async function applyTheme() {
+  const profile = getProfile();
+  let theme = profile ? profile.theme : 'auto';
+
+  if (!theme || theme === 'auto') {
+    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    try {
+      await StatusBar.setStyle({ style: Style.Dark });
+      await StatusBar.setBackgroundColor({ color: '#1A1C19' });
+    } catch (e) {
+      console.warn('StatusBar not available', e);
+    }
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    try {
+      await StatusBar.setStyle({ style: Style.Light });
+      await StatusBar.setBackgroundColor({ color: '#F7F2EA' });
+    } catch (e) {
+      console.warn('StatusBar not available', e);
+    }
+  }
+}
+
+// Watch for system theme changes if set to auto
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  const profile = getProfile();
+  if (!profile || !profile.theme || profile.theme === 'auto') {
+    applyTheme();
+  }
+});
+
+applyTheme();
+
+if (isOnboardingComplete()) {
+  state.screen = 'home';
+} else {
+  state.screen = 'onboarding';
+  state.onboardingStep = 0;
+}
+render();
+
+// Service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+import { App as CapacitorApp } from '@capacitor/app';
+import { disconnectHeartRateMonitor } from './utils/bluetooth.js';
+
+CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+  if (state.screen === 'home') {
+    CapacitorApp.exitApp();
+  } else if (state.screen === 'onboarding') {
+    if (state.onboardingStep > 0) {
+      state.onboardingStep--;
+      render();
+    } else {
+      CapacitorApp.exitApp();
+    }
+  } else {
+    if (state.timerInterval) {
+      clearInterval(state.timerInterval);
+      state.timerInterval = null;
+    }
+    if (state.trackerInterval) {
+      clearInterval(state.trackerInterval);
+      state.trackerInterval = null;
+    }
+    if (state.bluetoothDeviceId) {
+      disconnectHeartRateMonitor(state.bluetoothDeviceId);
+      state.bluetoothDeviceId = null;
+    }
+    state.screen = 'home';
+    render();
+  }
+});
+
+`
+
+## Bestand: src/state.js
+`javascript
+export const state = {
+  screen: 'home', 
+  onboardingStep: 0,
+  onboardingData: { name: '', gender: 'female', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: '' },
+  workoutSteps: [],
+  currentStepIndex: 0,
+  showingSectionIntro: false,
+  currentSectionId: null,
+  todayFocus: null,
+  timerInterval: null,
+  timerRunning: false,
+  timerRemaining: 0,
+  timerTotal: 0,
+  repsRemaining: 0,
+  repsTotal: 0,
+  comboPhase: 'reps',
+  exerciseComplete: false,
+  skippedCount: 0,
+  skippedCoreCount: 0,
+  liveBpm: null,
+  liveKcal: null,
+  bluetoothDeviceId: null,
+  trackerInterval: null,
+  justFinishedWorkout: false,
+  // Social/Auth State
+  currentUser: null,
+  authLoading: true,
+  leaderboard: [],
+  loadingLeaderboard: false,
+  myCommunities: [],
+  activeCommunity: 'global',
+};
+
+`
 
 ## Bestand: src/data/exercises.js
-```js
+`javascript
 /**
  * Complete exercise data for the Pilates Routine.
  *
@@ -3262,10 +3256,10 @@ export function buildWorkoutSteps(sectionIds, currentWeek, baseLevels = {}) {
 
 // End of file
 
-```
+`
 
 ## Bestand: src/utils/aiService.js
-```js
+`javascript
 import { CreateMLCEngine } from '@mlc-ai/web-llm';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -3699,10 +3693,998 @@ Analyseer de geüploade beelden van de oefening ("${exerciseName}"). Geef een he
 }
 
 
-```
+`
+
+## Bestand: src/utils/auth.js
+`javascript
+import { auth } from './firebase.js';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithCredential,
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+
+const googleProvider = new GoogleAuthProvider();
+
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+
+// Detect if running inside Capacitor (native app)
+function isNativeApp() {
+  return window.Capacitor?.isNative === true;
+}
+
+// Initialize GoogleAuth only on web platform (native platforms use configuration files and crash on initialize)
+if (!isNativeApp()) {
+  GoogleAuth.initialize({
+    clientId: '443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
+    grantOfflineAccess: true,
+  });
+}
+
+export function subscribeToAuth(callback) {
+  // Check for redirect result on app load (for native flow, if we ever fallback)
+  getRedirectResult(auth).catch(() => {});
+  return onAuthStateChanged(auth, callback);
+}
+
+export function getCurrentUser() {
+  return auth.currentUser;
+}
+
+export async function loginWithGoogle() {
+  try {
+    if (isNativeApp()) {
+      // In native app, use the Capacitor Google Auth plugin
+      const googleUser = await GoogleAuth.signIn();
+      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+      const result = await signInWithCredential(auth, credential);
+      return { user: result.user, error: null };
+    } else {
+      // On web, use popup
+      const result = await signInWithPopup(auth, googleProvider);
+      return { user: result.user, error: null };
+    }
+  } catch (error) {
+    return { user: null, error: error.message };
+  }
+}
+
+export async function loginWithEmail(email, password) {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    return { user: result.user, error: null };
+  } catch (error) {
+    return { user: null, error: error.message };
+  }
+}
+
+export async function registerWithEmail(email, password) {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    return { user: result.user, error: null };
+  } catch (error) {
+    return { user: null, error: error.message };
+  }
+}
+
+export async function logout() {
+  await signOut(auth);
+}
+
+
+`
+
+## Bestand: src/utils/bluetooth.js
+`javascript
+import { BleClient } from '@capacitor-community/bluetooth-le';
+
+const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
+const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
+
+export function isPlausibleHeartRate(value) {
+  return Number.isInteger(value) && value >= 30 && value <= 240;
+}
+
+/**
+ * Connects to a Bluetooth Low Energy Heart Rate Monitor.
+ * Requests the user to select a device broadcasting the Heart Rate Service.
+ * @param {Function} onHeartRateUpdate Callback fired when a new BPM is received.
+ * @param {Function} onDisconnect Callback fired when the device disconnects.
+ * @returns {Promise<string>} The device ID of the connected monitor.
+ */
+export async function connectHeartRateMonitor(onHeartRateUpdate, onDisconnect) {
+  try {
+    // Initialize the BLE client (requests necessary permissions on Android/iOS)
+    await BleClient.initialize();
+
+    // Request device that broadcasts the HR service
+    const device = await BleClient.requestDevice({
+      services: [HEART_RATE_SERVICE],
+    });
+
+    // Connect to the device
+    await BleClient.connect(device.deviceId, (disconnectedDeviceId) => {
+      console.log(`Smartwatch disconnected: ${disconnectedDeviceId}`);
+      if (onDisconnect) onDisconnect();
+    });
+
+    // Start receiving notifications
+    await BleClient.startNotifications(
+      device.deviceId,
+      HEART_RATE_SERVICE,
+      HEART_RATE_MEASUREMENT,
+      (value) => {
+        // Parse the characteristic value according to GATT specifications
+        // Value is a DataView. The first byte contains flags.
+        const flags = value.getUint8(0);
+        // If the 0th bit is 0, heart rate format is 8-bit (UINT8)
+        // If 1, format is 16-bit (UINT16)
+        const is16BitFormat = flags & 0x01;
+        
+        let heartRate;
+        if (is16BitFormat) {
+          heartRate = value.getUint16(1, true); // true for little-endian
+        } else {
+          heartRate = value.getUint8(1);
+        }
+        
+        if (isPlausibleHeartRate(heartRate)) {
+          onHeartRateUpdate(heartRate);
+        } else {
+          console.warn('Ignoring implausible BPM:', heartRate);
+        }
+      }
+    );
+    
+    return device.deviceId;
+  } catch (error) {
+    console.error("Bluetooth connection failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Disconnects from the connected Heart Rate Monitor.
+ * @param {string} deviceId The device ID to disconnect from.
+ */
+export async function disconnectHeartRateMonitor(deviceId) {
+  if (!deviceId) return;
+  try {
+    await BleClient.disconnect(deviceId);
+    console.log(`Disconnected from ${deviceId}`);
+  } catch (error) {
+    console.error("Failed to disconnect:", error);
+  }
+}
+
+`
+
+## Bestand: src/utils/firebase.js
+`javascript
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Cloud Firestore and get a reference to the service
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+
+`
+
+## Bestand: src/utils/i18n.js
+`javascript
+import { getProfile } from './storage.js';
+
+export const translations = {
+  nl: {
+    // Shared
+    'btn.back': '← Terug',
+    'btn.save': 'Opslaan',
+    'btn.cancel': 'Annuleren',
+    'btn.confirm': 'Bevestigen',
+    'btn.next': 'Volgende →',
+    'btn.quit': '✕ Stop',
+    'btn.skip': 'Overslaan',
+    'btn.start': '▶ Start',
+    'btn.pause': '⏸ Pauze',
+    'btn.finish': 'Afronden ✓',
+    'nav.home': 'Home',
+    'nav.coach': 'Coach',
+    'nav.community': 'Community',
+    'nav.settings': 'Instellingen',
+    
+    // Home
+    'home.greeting': 'Hoi',
+    'home.minPerDay': 'min per dag',
+    'home.daysPerWeek': 'dagen per week',
+    'home.avgLevel': 'Gem. Niveau',
+    'home.today': 'Vandaag',
+    'home.doneToday': 'Vandaag al voltooid — goed bezig! 💚',
+    'home.playAgain': '✓ Nogmaals oefenen',
+    'home.workouts': 'Workouts',
+    'home.weeks': 'Weken',
+    'home.intensity': 'Intensiteit',
+    'home.scienceBadge': 'Opbouw van de routine',
+    'home.quote': '♥ Jouw consistentie vandaag, is je resultaat morgen. ♥',
+    
+    // Calendar
+    'calendar.title': '📅 Schema',
+    'calendar.reset': 'Voortgang resetten',
+    'calendar.days': ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'],
+
+    // Onboarding
+    'ob.step.of': 'Stap {0} van {1}',
+    'ob.welcome.title': 'Welkom!',
+    'ob.welcome.sub': 'Laten we je Pilates routine instellen.',
+    'ob.name.label': 'Hoe mogen we je noemen?',
+    'ob.name.placeholder': 'Je naam...',
+    'ob.gender.title': 'Wat is je geslacht?',
+    'ob.gender.sub': 'Hier stemmen we de oefeningen op af.',
+    'ob.gender.f': 'Vrouw',
+    'ob.gender.m': 'Man',
+    'ob.gender.n': 'Liever niet zeggen',
+    'ob.goals.title': 'Waar wil je aan werken',
+    'ob.goals.sub': 'Kies één of meer focusgebieden.',
+    'ob.goals.legs': 'Billen & Benen',
+    'ob.goals.core': 'Core, Buik & Armen',
+    'ob.goals.back': 'Rug & Houding',
+    'ob.goals.all': 'Alles',
+    'ob.level.title': 'Wat is je startniveau?',
+    'ob.level.sub': 'We bouwen de intensiteit vanaf hier langzaam op.',
+    'ob.level.beg.title': 'Beginner (Makkelijk)',
+    'ob.level.beg.desc': 'Start rustig aan.',
+    'ob.level.int.title': 'Gemiddeld',
+    'ob.level.int.desc': 'Je hebt al wat ervaring.',
+    'ob.level.adv.title': 'Gevorderd',
+    'ob.level.adv.desc': 'Klaar voor een uitdaging!',
+    'ob.time.title': 'Tijd & frequentie',
+    'ob.time.sub': 'Hoeveel tijd per dag en hoe vaak per week?',
+    'ob.time.minLabel': 'Minuten per dag',
+    'ob.time.daysLabel': 'Dagen per week',
+    'ob.start.title': 'Wanneer begin je?',
+    'ob.start.sub': 'Het schema start op deze datum.',
+    'ob.btn.start': 'Starten! 🎉',
+
+    // Settings
+    'set.title': 'Instellingen',
+    'set.name': 'Naam',
+    'set.startDate': 'Startdatum Schema',
+    'set.lvl.core': 'Niveau Core, Buik & Armen',
+    'set.lvl.legs': 'Niveau Billen & Benen',
+    'set.lvl.back': 'Niveau Rug & Houding',
+    'set.gender': 'Geslacht',
+    'set.goals': 'Focusgebieden',
+    'set.stretch': 'Inclusief stretch',
+    'set.resetAll': 'Alles resetten & opnieuw beginnen',
+    'set.language': 'Taal',
+    'set.theme': 'Thema',
+    'set.theme.light': 'Licht',
+    'set.theme.dark': 'Donker',
+    'set.theme.auto': 'Automatisch',
+    
+    // Workout
+    'wk.nextSection': 'Volgende sectie',
+    'wk.hold': '🔒 Houd vast!',
+    'wk.ofReps': 'van {0} reps',
+    'wk.tapHint': 'Langzaam: ±4 sec. per rep',
+    'wk.tut.tooFast': 'Te snel! Behoud de spierspanning (Time Under Tension).',
+    'wk.seconds': 'seconden',
+    'wk.intro.encouragement1': 'Laten we beginnen, {0}! 🌿',
+    'wk.intro.encouragement2': 'Goed bezig, {0}! 💪',
+    'wk.intro.encouragement3': 'Klaar voor de volgende? 🔥',
+    'wk.intro.encouragement4': 'Je doet het geweldig! 🌟',
+    'wk.intro.btn': 'Laten we gaan →',
+
+    // Complete
+    'comp.title': 'Routine Voltooid!',
+    'comp.msg1': 'Geweldig gedaan, {0}! Je lichaam bedankt je. 💚',
+    'comp.msg2': 'Weer een workout erop! Elke dag een stapje sterker.',
+    'comp.msg3': 'Fantastisch! Consistentie is de sleutel. 🔑',
+    'comp.workoutsTotal': 'Workouts totaal',
+    'comp.currentWeek': 'Huidig',
+    'comp.btn.home': 'Terug naar Home',
+    'comp.btn.leaderboard': 'Bekijk Leaderboard 🏆',
+
+    // Community
+    'comm.title': 'Community 🏆',
+    'comm.logout': 'Log uit',
+    'comm.inviteCopy': '🔗 Invite Link Kopiëren',
+    'comm.inviteCopied': '✓ Gekopieerd!',
+    'comm.newGroup': '➕ Nieuwe Groep',
+    'comm.loading': 'Laden...',
+    'comm.empty': 'Nog niemand in deze groep.',
+    'comm.you': '(Jij)',
+    'comm.week': 'Week',
+    'comm.lastActive': 'Laatst actief:',
+    'comm.missed': 'gemist',
+
+    // Auth
+    'auth.title': 'Word lid van de Community',
+    'auth.sub1': 'Log in om je voortgang te vergelijken, samen met vrienden te trainen in privé groepen, en gemotiveerd te blijven.',
+    'auth.sub2': 'Log in om de uitnodiging voor groep <b>{0}</b> te accepteren!',
+    'auth.google': 'Ga verder met Google',
+    'auth.or': 'of',
+    'auth.email': 'E-mailadres',
+    'auth.pass': 'Wachtwoord',
+    'auth.loginBtn': 'Inloggen',
+    'auth.regBtn': 'Registreren',
+
+    // Dialogs
+    'dlg.quit.title': 'Routine stoppen?',
+    'dlg.quit.msg': 'Je voortgang voor deze workout gaat verloren.',
+    'dlg.quit.confirm': 'Doorgaan',
+    'dlg.quit.cancel': 'Stoppen',
+    'dlg.reset.title': 'Voortgang resetten?',
+    'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
+    'dlg.resetAll.title': 'Alles resetten (Lokaal & Cloud)?',
+    'dlg.resetAll.msg': 'Je lokale profiel én je opgeslagen cloud-voortgang worden hiermee volledig gewist.',
+    'dlg.science.title': '🧘 Principes van de Routine',
+    'dlg.science.msg': 'Deze routine maakt gebruik van een <b>rustig herhalingstempo</b> en <b>geleidelijke opbouw</b>.<br><br><b>Rustig tempo:</b> Door gecontroleerd te bewegen focus je op balans, houding en spierbeheersing.<br><b>Geleidelijke opbouw:</b> Het programma verhoogt in stappen de intensiteit om je spieren op een veilige manier uit te dagen.<br><br>Daarom is te snel doorklikken geblokkeerd.',
+
+    // Workout skip/fail
+    'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',
+    'wk.notCompleted.title': 'Niet voltooid',
+    'wk.notCompleted.msg': 'Je hebt meer dan de helft van de oefeningen overgeslagen. Deze workout telt helaas niet mee voor je voortgang.',
+
+    // Community prompts
+    'comm.createPrompt': 'Naam:',
+    'comm.createSuccess.title': 'Groep aangemaakt!',
+    'comm.createSuccess.msg': 'Deel de invite link met je vrienden.',
+    'comm.createError': 'Fout bij maken groep.',
+    'auth.fieldsRequired': 'Vul je e-mail en wachtwoord in.',
+
+    // Settings level labels
+    'set.lvl.0': 'Uit (Niet trainen)',
+    'set.lvl.1': 'Beginner (Makkelijk)',
+    'set.lvl.2': 'Beginner+',
+    'set.lvl.3': 'Licht Gemiddeld',
+    'set.lvl.4': 'Gemiddeld',
+    'set.lvl.5': 'Gemiddeld+',
+    'set.lvl.6': 'Gevorderd',
+    'set.lvl.7': 'Gevorderd+',
+    'set.lvl.8': 'Expert',
+
+    'side.been': 'been',
+    'side.kant': 'kant',
+  },
+  en: {
+    'side.been': 'leg',
+    'side.kant': 'side',
+    // Shared
+    'btn.back': '← Back',
+    'btn.save': 'Save',
+    'btn.cancel': 'Cancel',
+    'btn.confirm': 'Confirm',
+    'btn.next': 'Next →',
+    'btn.quit': '✕ Quit',
+    'btn.skip': 'Skip',
+    'btn.start': '▶ Start',
+    'btn.pause': '⏸ Pause',
+    'btn.finish': 'Finish ✓',
+    'nav.home': 'Home',
+    'nav.coach': 'Coach',
+    'nav.community': 'Community',
+    'nav.settings': 'Settings',
+
+    // Home
+    'home.greeting': 'Hi',
+    'home.minPerDay': 'min per day',
+    'home.daysPerWeek': 'days per week',
+    'home.avgLevel': 'Avg. Level',
+    'home.today': 'Today',
+    'home.doneToday': 'Already completed today — great job! 💚',
+    'home.playAgain': '✓ Practice Again',
+    'home.workouts': 'Workouts',
+    'home.weeks': 'Weeks',
+    'home.intensity': 'Intensity',
+    'home.scienceBadge': 'How the routine works',
+    'home.quote': '♥ Your consistency today is your result tomorrow. ♥',
+
+    // Calendar
+    'calendar.title': '📅 Schedule',
+    'calendar.reset': 'Reset Progress',
+    'calendar.days': ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+
+    // Onboarding
+    'ob.step.of': 'Step {0} of {1}',
+    'ob.welcome.title': 'Welcome!',
+    'ob.welcome.sub': "Let's set up your Pilates routine.",
+    'ob.name.label': 'What should we call you?',
+    'ob.name.placeholder': 'Your name...',
+    'ob.gender.title': 'What is your gender?',
+    'ob.gender.sub': 'We tailor the exercises based on this.',
+    'ob.gender.f': 'Female',
+    'ob.gender.m': 'Male',
+    'ob.gender.n': 'Prefer not to say',
+    'ob.goals.title': 'What do you want to work on',
+    'ob.goals.sub': 'Choose one or more focus areas.',
+    'ob.goals.legs': 'Glutes & Legs',
+    'ob.goals.core': 'Core, Abs & Arms',
+    'ob.goals.back': 'Back & Posture',
+    'ob.goals.all': 'Everything',
+    'ob.level.title': 'What is your starting level?',
+    'ob.level.sub': 'We will slowly build up the intensity from here.',
+    'ob.level.beg.title': 'Beginner (Easy)',
+    'ob.level.beg.desc': 'Start off slowly.',
+    'ob.level.int.title': 'Intermediate',
+    'ob.level.int.desc': 'You have some experience.',
+    'ob.level.adv.title': 'Advanced',
+    'ob.level.adv.desc': 'Ready for a challenge!',
+    'ob.time.title': 'Time & Frequency',
+    'ob.time.sub': 'How much time per day and how often per week?',
+    'ob.time.minLabel': 'Minutes per day',
+    'ob.time.daysLabel': 'Days per week',
+    'ob.start.title': 'When are you starting?',
+    'ob.start.sub': 'The routine will start on this date.',
+    'ob.btn.start': 'Start! 🎉',
+
+    // Settings
+    'set.title': 'Settings',
+    'set.name': 'Name',
+    'set.startDate': 'Routine Start Date',
+    'set.lvl.core': 'Level Core, Abs & Arms',
+    'set.lvl.legs': 'Level Glutes & Legs',
+    'set.lvl.back': 'Level Back & Posture',
+    'set.gender': 'Gender',
+    'set.goals': 'Focus Areas',
+    'set.stretch': 'Include stretch',
+    'set.resetAll': 'Reset Everything & Start Over',
+    'set.language': 'Language',
+    'set.theme': 'Theme',
+    'set.theme.light': 'Light',
+    'set.theme.dark': 'Dark',
+    'set.theme.auto': 'Auto',
+
+    // Workout
+    'wk.nextSection': 'Next section',
+    'wk.hold': '🔒 Hold it!',
+    'wk.ofReps': 'of {0} reps',
+    'wk.tapHint': 'Slow: ±4 sec. per rep',
+    'wk.tut.tooFast': 'Too fast! Maintain Time Under Tension (TUT).',
+    'wk.seconds': 'seconds',
+    'wk.intro.encouragement1': "Let's begin, {0}! 🌿",
+    'wk.intro.encouragement2': 'Great job, {0}! 💪',
+    'wk.intro.encouragement3': 'Ready for the next one? 🔥',
+    'wk.intro.encouragement4': "You're doing amazing! 🌟",
+    'wk.intro.btn': "Let's go →",
+
+    // Complete
+    'comp.title': 'Routine Completed!',
+    'comp.msg1': 'Amazing job, {0}! Your body thanks you. 💚',
+    'comp.msg2': 'Another workout in the bag! A little stronger every day.',
+    'comp.msg3': 'Fantastic! Consistency is key. 🔑',
+    'comp.workoutsTotal': 'Total Workouts',
+    'comp.currentWeek': 'Current',
+    'comp.btn.home': 'Back to Home',
+    'comp.btn.leaderboard': 'View Leaderboard 🏆',
+
+    // Community
+    'comm.title': 'Community 🏆',
+    'comm.logout': 'Logout',
+    'comm.inviteCopy': '🔗 Copy Invite Link',
+    'comm.inviteCopied': '✓ Copied!',
+    'comm.newGroup': '➕ New Group',
+    'comm.loading': 'Loading...',
+    'comm.empty': 'No one in this group yet.',
+    'comm.you': '(You)',
+    'comm.week': 'Week',
+    'comm.lastActive': 'Last active:',
+    'comm.missed': 'missed',
+
+    // Auth
+    'auth.title': 'Join the Community',
+    'auth.sub1': 'Log in to compare your progress, work out with friends in private groups, and stay motivated.',
+    'auth.sub2': 'Log in to accept the invite for group <b>{0}</b>!',
+    'auth.google': 'Continue with Google',
+    'auth.or': 'or',
+    'auth.email': 'Email Address',
+    'auth.pass': 'Password',
+    'auth.loginBtn': 'Login',
+    'auth.regBtn': 'Register',
+
+    // Dialogs
+    'dlg.quit.title': 'Quit routine?',
+    'dlg.quit.msg': 'Your progress for this workout will be lost.',
+    'dlg.quit.confirm': 'Continue Workout',
+    'dlg.quit.cancel': 'Quit', 
+    'dlg.reset.title': 'Reset progress?',
+    'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
+    'dlg.resetAll.title': 'Reset everything?',
+    'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
+    'dlg.science.title': '🧘 Routine Principles',
+    'dlg.science.msg': 'This routine utilizes a <b>controlled rep tempo</b> and <b>gradual progression</b>.<br><br><b>Controlled Tempo:</b> Moving with control helps focus on balance, posture, and muscle engagement.<br><b>Gradual Progression:</b> The program steps up intensity gradually to challenge your muscles safely.<br><br>Fast clicking is paused to encourage mindful execution.',
+
+    // Workout skip/fail
+    'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',
+    'wk.notCompleted.title': 'Not Completed',
+    'wk.notCompleted.msg': 'You skipped more than half of the exercises. This workout does not count towards your progress.',
+
+    // Community prompts
+    'comm.createPrompt': 'Name:',
+    'comm.createSuccess.title': 'Group created!',
+    'comm.createSuccess.msg': 'Share the invite link with your friends.',
+    'comm.createError': 'Error creating group.',
+    'auth.fieldsRequired': 'Please enter your email and password.',
+
+    // Settings level labels
+    'set.lvl.0': 'Off (Do not train)',
+    'set.lvl.1': 'Beginner (Easy)',
+    'set.lvl.2': 'Beginner+',
+    'set.lvl.3': 'Light Intermediate',
+    'set.lvl.4': 'Intermediate',
+    'set.lvl.5': 'Intermediate+',
+    'set.lvl.6': 'Advanced',
+    'set.lvl.7': 'Advanced+',
+    'set.lvl.8': 'Expert',
+  }
+};
+
+export function getLanguage() {
+  const profile = getProfile();
+  return profile?.language || 'nl';
+}
+
+export function t(key, ...args) {
+  const lang = getLanguage();
+  let text = translations[lang][key] || translations['nl'][key] || key;
+  
+  if (args && args.length > 0) {
+    args.forEach((arg, i) => {
+      text = text.replace(`{${i}}`, arg);
+    });
+  }
+  return text;
+}
+
+`
+
+## Bestand: src/utils/scheduler.js
+`javascript
+/**
+ * Scheduler — determines which sections to train today
+ * based on user goals and day rotation.
+ */
+
+import { SECTIONS } from '../data/exercises.js';
+import { getProfile, getProgramStartDate, formatDate, getTotalCompleted } from './storage.js';
+
+/**
+ * Goal ID to section mapping.
+ */
+const GOAL_SECTIONS = {
+  'billen-benen': ['benen-billen'],
+  'core': ['core'],
+  'rug': ['rug-houding'],
+  'alles': ['benen-billen', 'core', 'rug-houding'],
+};
+
+/**
+ * Goal ID to display info.
+ */
+export const GOAL_INFO = {
+  'billen-benen': { emoji: '🦵', label: 'Billen & Benen', color: '#D4A0A0' },
+  'core': { emoji: '🧱', label: 'Core, Buik & Armen', color: '#C4A882' },
+  'rug': { emoji: '🧘', label: 'Rug & Houding', color: '#B8A9C9' },
+  'alles': { emoji: '⭐', label: 'Alles', color: '#A8C09A' },
+};
+
+function getActiveGoals(profile) {
+  if (!profile) return ['alles'];
+
+  if (Array.isArray(profile.goals) && profile.goals.includes('alles')) {
+    return ['alles'];
+  }
+
+  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
+  const userGoals = Array.isArray(profile.goals) && profile.goals.length > 0 ? profile.goals : ['billen-benen', 'core', 'rug'];
+
+  const activeGoals = [];
+  if (userGoals.includes('core') && baseLevels.core !== 0) activeGoals.push('core');
+  if ((userGoals.includes('billen-benen') || userGoals.includes('benen-billen')) && baseLevels['benen-billen'] !== 0) activeGoals.push('billen-benen');
+  if (userGoals.includes('rug') && baseLevels['rug-houding'] !== 0) activeGoals.push('rug');
+
+  if (activeGoals.length === 3 || activeGoals.length === 0) return ['alles'];
+  return activeGoals;
+}
+
+/**
+ * Get the sections to train today based on user profile.
+ */
+export function getTodaysFocus() {
+  const profile = getProfile();
+  if (!profile) {
+    return {
+      sectionIds: ['warmup', 'benen-billen', 'core', 'rug-houding', 'stretch'],
+      focusLabel: 'Volledige Routine',
+      focusEmoji: '⭐',
+    };
+  }
+
+  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
+  const goals = getActiveGoals(profile);
+
+  if (goals.includes('alles')) {
+    const sectionIds = ['warmup'];
+    if (baseLevels.core > 0) sectionIds.push('core');
+    if (baseLevels['benen-billen'] > 0) sectionIds.push('benen-billen');
+    if (baseLevels['rug-houding'] > 0) sectionIds.push('rug-houding');
+    
+    const hasActiveSections = sectionIds.length > 1;
+    if (profile.includeStretch !== false) sectionIds.push('stretch');
+    
+    return {
+      sectionIds,
+      focusLabel: hasActiveSections ? 'Volledige Routine' : 'Herstel & Stretch',
+      focusEmoji: hasActiveSections ? '⭐' : '🧘',
+    };
+  }
+
+  if (goals.length === 1) {
+    const goal = goals[0];
+    const info = GOAL_INFO[goal];
+    const mainSections = GOAL_SECTIONS[goal] || [];
+    const sectionIds = ['warmup', ...mainSections];
+    if (profile.includeStretch !== false) sectionIds.push('stretch');
+    return {
+      sectionIds,
+      focusLabel: info.label,
+      focusEmoji: info.emoji,
+    };
+  }
+
+  const dayIndex = getWorkoutDayIndex();
+  const goalIndex = dayIndex % goals.length;
+  const todayGoal = goals[goalIndex];
+  const info = GOAL_INFO[todayGoal];
+  const mainSections = GOAL_SECTIONS[todayGoal] || [];
+  const sectionIds = ['warmup', ...mainSections];
+  if (profile.includeStretch !== false) sectionIds.push('stretch');
+
+  return {
+    sectionIds,
+    focusLabel: info.label,
+    focusEmoji: info.emoji,
+  };
+}
+
+export function getFocusForDate(dateStr) {
+  const profile = getProfile();
+  if (!profile) return GOAL_INFO['alles'];
+
+  const goals = getActiveGoals(profile);
+
+  if (goals.includes('alles') || goals.length === 1) {
+    const goal = goals.includes('alles') ? 'alles' : goals[0];
+    return GOAL_INFO[goal];
+  }
+
+  const startDate = getProgramStartDate();
+  if (!startDate) return GOAL_INFO['alles'];
+
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.floor((target - start) / (1000 * 60 * 60 * 24));
+  const goalIndex = ((diffDays % goals.length) + goals.length) % goals.length;
+
+  return GOAL_INFO[goals[goalIndex]];
+}
+
+export function getGoalSubtitle() {
+  const profile = getProfile();
+  if (!profile) return 'Strakke benen & strakke buik';
+
+  const goals = getActiveGoals(profile);
+
+  if (goals.includes('alles')) {
+    return 'Strakke benen, sterke core & gezonde rug';
+  }
+
+  const parts = goals.map(g => {
+    switch (g) {
+      case 'billen-benen': return 'strakke billen & benen';
+      case 'core': return 'sterke core & buik';
+      case 'rug': return 'gezonde rug & houding';
+      default: return '';
+    }
+  }).filter(Boolean);
+
+  return parts.join(' & ').replace(/^./, c => c.toUpperCase());
+}
+
+function getWorkoutDayIndex() {
+  return getTotalCompleted();
+}
+
+`
+
+## Bestand: src/utils/social.js
+`javascript
+import { db } from './firebase.js';
+import { getCurrentUser } from './auth.js';
+import { 
+  doc, setDoc, getDoc, getDocs, deleteDoc, writeBatch,
+  collection, arrayUnion, serverTimestamp 
+} from 'firebase/firestore';
+
+/**
+ * Initialize or update user document in Firestore on login.
+ */
+export async function initializeSocialUser(localProfile, localTotal = 0, localWeek = 1, localMissed = 0) {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+
+    let communities = ['global'];
+
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        name: localProfile.name || user.displayName || 'Pilates Fan',
+        totalWorkouts: localTotal || 0,
+        currentWeek: localWeek || 1,
+        missedWorkouts: localMissed || 0,
+        communities: communities,
+        lastActive: serverTimestamp()
+      });
+    } else {
+      const data = userSnap.data();
+      communities = data.communities || ['global'];
+      await setDoc(userRef, {
+        name: localProfile.name || data.name || user.displayName || 'Pilates Fan',
+        totalWorkouts: Math.max(localTotal, data.totalWorkouts || 0),
+        currentWeek: Math.max(localWeek, data.currentWeek || 1),
+        missedWorkouts: localMissed || data.missedWorkouts || 0,
+        communities: communities,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+    }
+
+    return communities;
+  } catch (error) {
+    console.error("Error initializing social user:", error);
+  }
+}
+
+/**
+ * Push the current user's progress to Firestore atomically across user and community member documents.
+ */
+export async function pushUserProgress(data) {
+  const user = getCurrentUser();
+  if (!user) return; // Only push if authenticated
+
+  try {
+    const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    batch.set(userRef, {
+      name: displayName,
+      totalWorkouts: data.totalWorkouts || 0,
+      currentWeek: data.currentWeek || 1,
+      missedWorkouts: data.missedWorkouts || 0,
+      lastActive: serverTimestamp()
+    }, { merge: true });
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      batch.set(memberRef, {
+        displayName: displayName,
+        score: data.totalWorkouts || 0,
+        currentWeek: data.currentWeek || 1,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+    }
+
+    await batch.commit();
+  } catch (error) {
+    console.error("Error pushing progress in batch:", error);
+    throw error;
+  }
+}
+
+/**
+ * Reset cloud progress for authenticated user, deleting user document and all community member entries atomically.
+ */
+export async function resetCloudProgress() {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      batch.delete(memberRef);
+    }
+
+    batch.delete(userRef);
+    await batch.commit();
+  } catch (error) {
+    console.warn("Could not delete cloud user documents:", error);
+  }
+}
+
+/**
+ * Fetch the leaderboard for a specific community.
+ */
+export async function getLeaderboard(communityCode = 'global') {
+  try {
+    const membersRef = collection(db, 'communities', communityCode, 'members');
+    const querySnapshot = await getDocs(membersRef);
+    
+    const leaderboard = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      let lastActiveStr = 'Onbekend';
+      if (data.lastActive && data.lastActive.toDate) {
+        lastActiveStr = data.lastActive.toDate().toLocaleDateString();
+      } else if (data.lastActive) {
+        lastActiveStr = new Date(data.lastActive).toLocaleDateString();
+      }
+
+      leaderboard.push({
+        id: doc.id,
+        name: data.displayName || 'Pilates Fan',
+        totalWorkouts: data.score || 0,
+        missedWorkouts: 0,
+        currentWeek: data.currentWeek || 1,
+        lastActive: lastActiveStr
+      });
+    });
+    
+    leaderboard.sort((a, b) => b.totalWorkouts - a.totalWorkouts);
+    return leaderboard;
+  } catch (error) {
+    console.error("Error fetching leaderboard:", error);
+    return [];
+  }
+}
+
+/**
+ * Create a new community
+ */
+function sanitizeText(str, maxLen = 40) {
+  if (!str || typeof str !== 'string') return '';
+  return str.replace(/<[^>]*>/g, '').trim().substring(0, maxLen);
+}
+
+export async function createCommunity(name) {
+  try {
+    const user = getCurrentUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const cleanName = sanitizeText(name, 40);
+    if (!cleanName) throw new Error("Ongeldige groepsnaam.");
+
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const commRef = doc(db, 'communities', code);
+    await setDoc(commRef, {
+      id: code,
+      name: cleanName,
+      ownerId: user.uid,
+      createdAt: serverTimestamp()
+    });
+
+    // Add owner to this community
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      communities: arrayUnion(code)
+    }, { merge: true });
+
+    return code;
+  } catch (error) {
+    console.error("Error creating community:", error);
+    import('../ui/core.js').then(module => module.showToast('Fout bij maken groep.', 'error'));
+    throw error;
+  }
+}
+
+/**
+ * Join an existing community by code
+ */
+export async function joinCommunity(code) {
+  try {
+    const user = getCurrentUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const formattedCode = code.trim().toUpperCase();
+
+    // Optionally verify if community exists
+    const commRef = doc(db, 'communities', formattedCode);
+    const commSnap = await getDoc(commRef);
+    
+    if (!commSnap.exists() && formattedCode !== 'GLOBAL') {
+      throw new Error("Community niet gevonden!");
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      communities: arrayUnion(formattedCode)
+    }, { merge: true });
+
+    return formattedCode;
+  } catch (error) {
+    console.error("Error joining community:", error);
+    import('../ui/core.js').then(module => module.showToast(error.message || 'Fout bij joinen groep.', 'error'));
+    throw error;
+  }
+}
+
+/**
+ * Get user's communities details
+ */
+export async function getUserCommunities() {
+  try {
+    const user = getCurrentUser();
+    if (!user) return [];
+
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) return [{ id: 'global', name: 'Global' }];
+
+    const data = userSnap.data();
+    const codes = data.communities || ['global'];
+
+    const results = [];
+    for (const code of codes) {
+      if (code === 'global' || code === 'GLOBAL') {
+        results.push({ id: 'global', name: 'Global Community' });
+      } else {
+        const commRef = doc(db, 'communities', code);
+        const commSnap = await getDoc(commRef);
+        if (commSnap.exists()) {
+          results.push({ id: code, name: commSnap.data().name });
+        } else {
+          results.push({ id: code, name: `Groep ${code}` }); // Fallback
+        }
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error("Error getting user communities:", error);
+    import('../ui/core.js').then(module => module.showToast('Kan groepen niet laden.', 'error'));
+    return [{ id: 'global', name: 'Global' }];
+  }
+}
+
+`
 
 ## Bestand: src/utils/storage.js
-```js
+`javascript
 /**
  * LocalStorage utilities for user profile and 8-week progress tracking.
  *
@@ -4074,998 +5056,10 @@ export function formatDate(date) {
   return `${y}-${m}-${d}`;
 }
 
-```
-
-## Bestand: src/utils/scheduler.js
-```js
-/**
- * Scheduler — determines which sections to train today
- * based on user goals and day rotation.
- */
-
-import { SECTIONS } from '../data/exercises.js';
-import { getProfile, getProgramStartDate, formatDate, getTotalCompleted } from './storage.js';
-
-/**
- * Goal ID to section mapping.
- */
-const GOAL_SECTIONS = {
-  'billen-benen': ['benen-billen'],
-  'core': ['core'],
-  'rug': ['rug-houding'],
-  'alles': ['benen-billen', 'core', 'rug-houding'],
-};
-
-/**
- * Goal ID to display info.
- */
-export const GOAL_INFO = {
-  'billen-benen': { emoji: '🦵', label: 'Billen & Benen', color: '#D4A0A0' },
-  'core': { emoji: '🧱', label: 'Core, Buik & Armen', color: '#C4A882' },
-  'rug': { emoji: '🧘', label: 'Rug & Houding', color: '#B8A9C9' },
-  'alles': { emoji: '⭐', label: 'Alles', color: '#A8C09A' },
-};
-
-function getActiveGoals(profile) {
-  if (!profile) return ['alles'];
-
-  if (Array.isArray(profile.goals) && profile.goals.includes('alles')) {
-    return ['alles'];
-  }
-
-  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
-  const userGoals = Array.isArray(profile.goals) && profile.goals.length > 0 ? profile.goals : ['billen-benen', 'core', 'rug'];
-
-  const activeGoals = [];
-  if (userGoals.includes('core') && baseLevels.core !== 0) activeGoals.push('core');
-  if ((userGoals.includes('billen-benen') || userGoals.includes('benen-billen')) && baseLevels['benen-billen'] !== 0) activeGoals.push('billen-benen');
-  if (userGoals.includes('rug') && baseLevels['rug-houding'] !== 0) activeGoals.push('rug');
-
-  if (activeGoals.length === 3 || activeGoals.length === 0) return ['alles'];
-  return activeGoals;
-}
-
-/**
- * Get the sections to train today based on user profile.
- */
-export function getTodaysFocus() {
-  const profile = getProfile();
-  if (!profile) {
-    return {
-      sectionIds: ['warmup', 'benen-billen', 'core', 'rug-houding', 'stretch'],
-      focusLabel: 'Volledige Routine',
-      focusEmoji: '⭐',
-    };
-  }
-
-  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
-  const goals = getActiveGoals(profile);
-
-  if (goals.includes('alles')) {
-    const sectionIds = ['warmup'];
-    if (baseLevels.core > 0) sectionIds.push('core');
-    if (baseLevels['benen-billen'] > 0) sectionIds.push('benen-billen');
-    if (baseLevels['rug-houding'] > 0) sectionIds.push('rug-houding');
-    
-    const hasActiveSections = sectionIds.length > 1;
-    if (profile.includeStretch !== false) sectionIds.push('stretch');
-    
-    return {
-      sectionIds,
-      focusLabel: hasActiveSections ? 'Volledige Routine' : 'Herstel & Stretch',
-      focusEmoji: hasActiveSections ? '⭐' : '🧘',
-    };
-  }
-
-  if (goals.length === 1) {
-    const goal = goals[0];
-    const info = GOAL_INFO[goal];
-    const mainSections = GOAL_SECTIONS[goal] || [];
-    const sectionIds = ['warmup', ...mainSections];
-    if (profile.includeStretch !== false) sectionIds.push('stretch');
-    return {
-      sectionIds,
-      focusLabel: info.label,
-      focusEmoji: info.emoji,
-    };
-  }
-
-  const dayIndex = getWorkoutDayIndex();
-  const goalIndex = dayIndex % goals.length;
-  const todayGoal = goals[goalIndex];
-  const info = GOAL_INFO[todayGoal];
-  const mainSections = GOAL_SECTIONS[todayGoal] || [];
-  const sectionIds = ['warmup', ...mainSections];
-  if (profile.includeStretch !== false) sectionIds.push('stretch');
-
-  return {
-    sectionIds,
-    focusLabel: info.label,
-    focusEmoji: info.emoji,
-  };
-}
-
-export function getFocusForDate(dateStr) {
-  const profile = getProfile();
-  if (!profile) return GOAL_INFO['alles'];
-
-  const goals = getActiveGoals(profile);
-
-  if (goals.includes('alles') || goals.length === 1) {
-    const goal = goals.includes('alles') ? 'alles' : goals[0];
-    return GOAL_INFO[goal];
-  }
-
-  const startDate = getProgramStartDate();
-  if (!startDate) return GOAL_INFO['alles'];
-
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.floor((target - start) / (1000 * 60 * 60 * 24));
-  const goalIndex = ((diffDays % goals.length) + goals.length) % goals.length;
-
-  return GOAL_INFO[goals[goalIndex]];
-}
-
-export function getGoalSubtitle() {
-  const profile = getProfile();
-  if (!profile) return 'Strakke benen & strakke buik';
-
-  const goals = getActiveGoals(profile);
-
-  if (goals.includes('alles')) {
-    return 'Strakke benen, sterke core & gezonde rug';
-  }
-
-  const parts = goals.map(g => {
-    switch (g) {
-      case 'billen-benen': return 'strakke billen & benen';
-      case 'core': return 'sterke core & buik';
-      case 'rug': return 'gezonde rug & houding';
-      default: return '';
-    }
-  }).filter(Boolean);
-
-  return parts.join(' & ').replace(/^./, c => c.toUpperCase());
-}
-
-function getWorkoutDayIndex() {
-  return getTotalCompleted();
-}
-
-```
-
-## Bestand: src/utils/social.js
-```js
-import { db } from './firebase.js';
-import { getCurrentUser } from './auth.js';
-import { 
-  doc, setDoc, getDoc, getDocs, deleteDoc, writeBatch,
-  collection, arrayUnion, serverTimestamp 
-} from 'firebase/firestore';
-
-/**
- * Initialize or update user document in Firestore on login.
- */
-export async function initializeSocialUser(localProfile, localTotal = 0, localWeek = 1, localMissed = 0) {
-  try {
-    const user = getCurrentUser();
-    if (!user) return;
-
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-
-    let communities = ['global'];
-
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        name: localProfile.name || user.displayName || 'Pilates Fan',
-        totalWorkouts: localTotal || 0,
-        currentWeek: localWeek || 1,
-        missedWorkouts: localMissed || 0,
-        communities: communities,
-        lastActive: serverTimestamp()
-      });
-    } else {
-      const data = userSnap.data();
-      communities = data.communities || ['global'];
-      await setDoc(userRef, {
-        name: localProfile.name || data.name || user.displayName || 'Pilates Fan',
-        totalWorkouts: Math.max(localTotal, data.totalWorkouts || 0),
-        currentWeek: Math.max(localWeek, data.currentWeek || 1),
-        missedWorkouts: localMissed || data.missedWorkouts || 0,
-        communities: communities,
-        lastActive: serverTimestamp()
-      }, { merge: true });
-    }
-
-    return communities;
-  } catch (error) {
-    console.error("Error initializing social user:", error);
-  }
-}
-
-/**
- * Push the current user's progress to Firestore atomically across user and community member documents.
- */
-export async function pushUserProgress(data) {
-  const user = getCurrentUser();
-  if (!user) return; // Only push if authenticated
-
-  try {
-    const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
-
-    const batch = writeBatch(db);
-
-    batch.set(userRef, {
-      name: displayName,
-      totalWorkouts: data.totalWorkouts || 0,
-      currentWeek: data.currentWeek || 1,
-      missedWorkouts: data.missedWorkouts || 0,
-      lastActive: serverTimestamp()
-    }, { merge: true });
-
-    for (const commCode of communities) {
-      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
-      batch.set(memberRef, {
-        displayName: displayName,
-        score: data.totalWorkouts || 0,
-        currentWeek: data.currentWeek || 1,
-        lastActive: serverTimestamp()
-      }, { merge: true });
-    }
-
-    await batch.commit();
-  } catch (error) {
-    console.error("Error pushing progress in batch:", error);
-    throw error;
-  }
-}
-
-/**
- * Reset cloud progress for authenticated user, deleting user document and all community member entries atomically.
- */
-export async function resetCloudProgress() {
-  try {
-    const user = getCurrentUser();
-    if (!user) return;
-
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
-
-    const batch = writeBatch(db);
-
-    for (const commCode of communities) {
-      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
-      batch.delete(memberRef);
-    }
-
-    batch.delete(userRef);
-    await batch.commit();
-  } catch (error) {
-    console.warn("Could not delete cloud user documents:", error);
-  }
-}
-
-/**
- * Fetch the leaderboard for a specific community.
- */
-export async function getLeaderboard(communityCode = 'global') {
-  try {
-    const membersRef = collection(db, 'communities', communityCode, 'members');
-    const querySnapshot = await getDocs(membersRef);
-    
-    const leaderboard = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      let lastActiveStr = 'Onbekend';
-      if (data.lastActive && data.lastActive.toDate) {
-        lastActiveStr = data.lastActive.toDate().toLocaleDateString();
-      } else if (data.lastActive) {
-        lastActiveStr = new Date(data.lastActive).toLocaleDateString();
-      }
-
-      leaderboard.push({
-        id: doc.id,
-        name: data.displayName || 'Pilates Fan',
-        totalWorkouts: data.score || 0,
-        missedWorkouts: 0,
-        currentWeek: data.currentWeek || 1,
-        lastActive: lastActiveStr
-      });
-    });
-    
-    leaderboard.sort((a, b) => b.totalWorkouts - a.totalWorkouts);
-    return leaderboard;
-  } catch (error) {
-    console.error("Error fetching leaderboard:", error);
-    return [];
-  }
-}
-
-/**
- * Create a new community
- */
-function sanitizeText(str, maxLen = 40) {
-  if (!str || typeof str !== 'string') return '';
-  return str.replace(/<[^>]*>/g, '').trim().substring(0, maxLen);
-}
-
-export async function createCommunity(name) {
-  try {
-    const user = getCurrentUser();
-    if (!user) throw new Error("Not authenticated");
-
-    const cleanName = sanitizeText(name, 40);
-    if (!cleanName) throw new Error("Ongeldige groepsnaam.");
-
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    const commRef = doc(db, 'communities', code);
-    await setDoc(commRef, {
-      id: code,
-      name: cleanName,
-      ownerId: user.uid,
-      createdAt: serverTimestamp()
-    });
-
-    // Add owner to this community
-    const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      communities: arrayUnion(code)
-    }, { merge: true });
-
-    return code;
-  } catch (error) {
-    console.error("Error creating community:", error);
-    import('../ui/core.js').then(module => module.showToast('Fout bij maken groep.', 'error'));
-    throw error;
-  }
-}
-
-/**
- * Join an existing community by code
- */
-export async function joinCommunity(code) {
-  try {
-    const user = getCurrentUser();
-    if (!user) throw new Error("Not authenticated");
-
-    const formattedCode = code.trim().toUpperCase();
-
-    // Optionally verify if community exists
-    const commRef = doc(db, 'communities', formattedCode);
-    const commSnap = await getDoc(commRef);
-    
-    if (!commSnap.exists() && formattedCode !== 'GLOBAL') {
-      throw new Error("Community niet gevonden!");
-    }
-
-    const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      communities: arrayUnion(formattedCode)
-    }, { merge: true });
-
-    return formattedCode;
-  } catch (error) {
-    console.error("Error joining community:", error);
-    import('../ui/core.js').then(module => module.showToast(error.message || 'Fout bij joinen groep.', 'error'));
-    throw error;
-  }
-}
-
-/**
- * Get user's communities details
- */
-export async function getUserCommunities() {
-  try {
-    const user = getCurrentUser();
-    if (!user) return [];
-
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) return [{ id: 'global', name: 'Global' }];
-
-    const data = userSnap.data();
-    const codes = data.communities || ['global'];
-
-    const results = [];
-    for (const code of codes) {
-      if (code === 'global' || code === 'GLOBAL') {
-        results.push({ id: 'global', name: 'Global Community' });
-      } else {
-        const commRef = doc(db, 'communities', code);
-        const commSnap = await getDoc(commRef);
-        if (commSnap.exists()) {
-          results.push({ id: code, name: commSnap.data().name });
-        } else {
-          results.push({ id: code, name: `Groep ${code}` }); // Fallback
-        }
-      }
-    }
-
-    return results;
-  } catch (error) {
-    console.error("Error getting user communities:", error);
-    import('../ui/core.js').then(module => module.showToast('Kan groepen niet laden.', 'error'));
-    return [{ id: 'global', name: 'Global' }];
-  }
-}
-
-```
-
-## Bestand: src/utils/auth.js
-```js
-import { auth } from './firebase.js';
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithCredential,
-  signOut, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-
-const googleProvider = new GoogleAuthProvider();
-
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-
-// Detect if running inside Capacitor (native app)
-function isNativeApp() {
-  return window.Capacitor?.isNative === true;
-}
-
-// Initialize GoogleAuth only on web platform (native platforms use configuration files and crash on initialize)
-if (!isNativeApp()) {
-  GoogleAuth.initialize({
-    clientId: '443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com',
-    scopes: ['profile', 'email'],
-    grantOfflineAccess: true,
-  });
-}
-
-export function subscribeToAuth(callback) {
-  // Check for redirect result on app load (for native flow, if we ever fallback)
-  getRedirectResult(auth).catch(() => {});
-  return onAuthStateChanged(auth, callback);
-}
-
-export function getCurrentUser() {
-  return auth.currentUser;
-}
-
-export async function loginWithGoogle() {
-  try {
-    if (isNativeApp()) {
-      // In native app, use the Capacitor Google Auth plugin
-      const googleUser = await GoogleAuth.signIn();
-      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-      const result = await signInWithCredential(auth, credential);
-      return { user: result.user, error: null };
-    } else {
-      // On web, use popup
-      const result = await signInWithPopup(auth, googleProvider);
-      return { user: result.user, error: null };
-    }
-  } catch (error) {
-    return { user: null, error: error.message };
-  }
-}
-
-export async function loginWithEmail(email, password) {
-  try {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return { user: result.user, error: null };
-  } catch (error) {
-    return { user: null, error: error.message };
-  }
-}
-
-export async function registerWithEmail(email, password) {
-  try {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    return { user: result.user, error: null };
-  } catch (error) {
-    return { user: null, error: error.message };
-  }
-}
-
-export async function logout() {
-  await signOut(auth);
-}
-
-
-```
-
-## Bestand: src/utils/i18n.js
-```js
-import { getProfile } from './storage.js';
-
-export const translations = {
-  nl: {
-    // Shared
-    'btn.back': '← Terug',
-    'btn.save': 'Opslaan',
-    'btn.cancel': 'Annuleren',
-    'btn.confirm': 'Bevestigen',
-    'btn.next': 'Volgende →',
-    'btn.quit': '✕ Stop',
-    'btn.skip': 'Overslaan',
-    'btn.start': '▶ Start',
-    'btn.pause': '⏸ Pauze',
-    'btn.finish': 'Afronden ✓',
-    'nav.home': 'Home',
-    'nav.coach': 'Coach',
-    'nav.community': 'Community',
-    'nav.settings': 'Instellingen',
-    
-    // Home
-    'home.greeting': 'Hoi',
-    'home.minPerDay': 'min per dag',
-    'home.daysPerWeek': 'dagen per week',
-    'home.avgLevel': 'Gem. Niveau',
-    'home.today': 'Vandaag',
-    'home.doneToday': 'Vandaag al voltooid — goed bezig! 💚',
-    'home.playAgain': '✓ Nogmaals oefenen',
-    'home.workouts': 'Workouts',
-    'home.weeks': 'Weken',
-    'home.intensity': 'Intensiteit',
-    'home.scienceBadge': 'Opbouw van de routine',
-    'home.quote': '♥ Jouw consistentie vandaag, is je resultaat morgen. ♥',
-    
-    // Calendar
-    'calendar.title': '📅 Schema',
-    'calendar.reset': 'Voortgang resetten',
-    'calendar.days': ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'],
-
-    // Onboarding
-    'ob.step.of': 'Stap {0} van {1}',
-    'ob.welcome.title': 'Welkom!',
-    'ob.welcome.sub': 'Laten we je Pilates routine instellen.',
-    'ob.name.label': 'Hoe mogen we je noemen?',
-    'ob.name.placeholder': 'Je naam...',
-    'ob.gender.title': 'Wat is je geslacht?',
-    'ob.gender.sub': 'Hier stemmen we de oefeningen op af.',
-    'ob.gender.f': 'Vrouw',
-    'ob.gender.m': 'Man',
-    'ob.gender.n': 'Liever niet zeggen',
-    'ob.goals.title': 'Waar wil je aan werken',
-    'ob.goals.sub': 'Kies één of meer focusgebieden.',
-    'ob.goals.legs': 'Billen & Benen',
-    'ob.goals.core': 'Core, Buik & Armen',
-    'ob.goals.back': 'Rug & Houding',
-    'ob.goals.all': 'Alles',
-    'ob.level.title': 'Wat is je startniveau?',
-    'ob.level.sub': 'We bouwen de intensiteit vanaf hier langzaam op.',
-    'ob.level.beg.title': 'Beginner (Makkelijk)',
-    'ob.level.beg.desc': 'Start rustig aan.',
-    'ob.level.int.title': 'Gemiddeld',
-    'ob.level.int.desc': 'Je hebt al wat ervaring.',
-    'ob.level.adv.title': 'Gevorderd',
-    'ob.level.adv.desc': 'Klaar voor een uitdaging!',
-    'ob.time.title': 'Tijd & frequentie',
-    'ob.time.sub': 'Hoeveel tijd per dag en hoe vaak per week?',
-    'ob.time.minLabel': 'Minuten per dag',
-    'ob.time.daysLabel': 'Dagen per week',
-    'ob.start.title': 'Wanneer begin je?',
-    'ob.start.sub': 'Het schema start op deze datum.',
-    'ob.btn.start': 'Starten! 🎉',
-
-    // Settings
-    'set.title': 'Instellingen',
-    'set.name': 'Naam',
-    'set.startDate': 'Startdatum Schema',
-    'set.lvl.core': 'Niveau Core, Buik & Armen',
-    'set.lvl.legs': 'Niveau Billen & Benen',
-    'set.lvl.back': 'Niveau Rug & Houding',
-    'set.gender': 'Geslacht',
-    'set.goals': 'Focusgebieden',
-    'set.stretch': 'Inclusief stretch',
-    'set.resetAll': 'Alles resetten & opnieuw beginnen',
-    'set.language': 'Taal',
-    'set.theme': 'Thema',
-    'set.theme.light': 'Licht',
-    'set.theme.dark': 'Donker',
-    'set.theme.auto': 'Automatisch',
-    
-    // Workout
-    'wk.nextSection': 'Volgende sectie',
-    'wk.hold': '🔒 Houd vast!',
-    'wk.ofReps': 'van {0} reps',
-    'wk.tapHint': 'Langzaam: ±4 sec. per rep',
-    'wk.tut.tooFast': 'Te snel! Behoud de spierspanning (Time Under Tension).',
-    'wk.seconds': 'seconden',
-    'wk.intro.encouragement1': 'Laten we beginnen, {0}! 🌿',
-    'wk.intro.encouragement2': 'Goed bezig, {0}! 💪',
-    'wk.intro.encouragement3': 'Klaar voor de volgende? 🔥',
-    'wk.intro.encouragement4': 'Je doet het geweldig! 🌟',
-    'wk.intro.btn': 'Laten we gaan →',
-
-    // Complete
-    'comp.title': 'Routine Voltooid!',
-    'comp.msg1': 'Geweldig gedaan, {0}! Je lichaam bedankt je. 💚',
-    'comp.msg2': 'Weer een workout erop! Elke dag een stapje sterker.',
-    'comp.msg3': 'Fantastisch! Consistentie is de sleutel. 🔑',
-    'comp.workoutsTotal': 'Workouts totaal',
-    'comp.currentWeek': 'Huidig',
-    'comp.btn.home': 'Terug naar Home',
-    'comp.btn.leaderboard': 'Bekijk Leaderboard 🏆',
-
-    // Community
-    'comm.title': 'Community 🏆',
-    'comm.logout': 'Log uit',
-    'comm.inviteCopy': '🔗 Invite Link Kopiëren',
-    'comm.inviteCopied': '✓ Gekopieerd!',
-    'comm.newGroup': '➕ Nieuwe Groep',
-    'comm.loading': 'Laden...',
-    'comm.empty': 'Nog niemand in deze groep.',
-    'comm.you': '(Jij)',
-    'comm.week': 'Week',
-    'comm.lastActive': 'Laatst actief:',
-    'comm.missed': 'gemist',
-
-    // Auth
-    'auth.title': 'Word lid van de Community',
-    'auth.sub1': 'Log in om je voortgang te vergelijken, samen met vrienden te trainen in privé groepen, en gemotiveerd te blijven.',
-    'auth.sub2': 'Log in om de uitnodiging voor groep <b>{0}</b> te accepteren!',
-    'auth.google': 'Ga verder met Google',
-    'auth.or': 'of',
-    'auth.email': 'E-mailadres',
-    'auth.pass': 'Wachtwoord',
-    'auth.loginBtn': 'Inloggen',
-    'auth.regBtn': 'Registreren',
-
-    // Dialogs
-    'dlg.quit.title': 'Routine stoppen?',
-    'dlg.quit.msg': 'Je voortgang voor deze workout gaat verloren.',
-    'dlg.quit.confirm': 'Doorgaan',
-    'dlg.quit.cancel': 'Stoppen',
-    'dlg.reset.title': 'Voortgang resetten?',
-    'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
-    'dlg.resetAll.title': 'Alles resetten (Lokaal & Cloud)?',
-    'dlg.resetAll.msg': 'Je lokale profiel én je opgeslagen cloud-voortgang worden hiermee volledig gewist.',
-    'dlg.science.title': '🧘 Principes van de Routine',
-    'dlg.science.msg': 'Deze routine maakt gebruik van een <b>rustig herhalingstempo</b> en <b>geleidelijke opbouw</b>.<br><br><b>Rustig tempo:</b> Door gecontroleerd te bewegen focus je op balans, houding en spierbeheersing.<br><b>Geleidelijke opbouw:</b> Het programma verhoogt in stappen de intensiteit om je spieren op een veilige manier uit te dagen.<br><br>Daarom is te snel doorklikken geblokkeerd.',
-
-    // Workout skip/fail
-    'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',
-    'wk.notCompleted.title': 'Niet voltooid',
-    'wk.notCompleted.msg': 'Je hebt meer dan de helft van de oefeningen overgeslagen. Deze workout telt helaas niet mee voor je voortgang.',
-
-    // Community prompts
-    'comm.createPrompt': 'Naam:',
-    'comm.createSuccess.title': 'Groep aangemaakt!',
-    'comm.createSuccess.msg': 'Deel de invite link met je vrienden.',
-    'comm.createError': 'Fout bij maken groep.',
-    'auth.fieldsRequired': 'Vul je e-mail en wachtwoord in.',
-
-    // Settings level labels
-    'set.lvl.0': 'Uit (Niet trainen)',
-    'set.lvl.1': 'Beginner (Makkelijk)',
-    'set.lvl.2': 'Beginner+',
-    'set.lvl.3': 'Licht Gemiddeld',
-    'set.lvl.4': 'Gemiddeld',
-    'set.lvl.5': 'Gemiddeld+',
-    'set.lvl.6': 'Gevorderd',
-    'set.lvl.7': 'Gevorderd+',
-    'set.lvl.8': 'Expert',
-
-    'side.been': 'been',
-    'side.kant': 'kant',
-  },
-  en: {
-    'side.been': 'leg',
-    'side.kant': 'side',
-    // Shared
-    'btn.back': '← Back',
-    'btn.save': 'Save',
-    'btn.cancel': 'Cancel',
-    'btn.confirm': 'Confirm',
-    'btn.next': 'Next →',
-    'btn.quit': '✕ Quit',
-    'btn.skip': 'Skip',
-    'btn.start': '▶ Start',
-    'btn.pause': '⏸ Pause',
-    'btn.finish': 'Finish ✓',
-    'nav.home': 'Home',
-    'nav.coach': 'Coach',
-    'nav.community': 'Community',
-    'nav.settings': 'Settings',
-
-    // Home
-    'home.greeting': 'Hi',
-    'home.minPerDay': 'min per day',
-    'home.daysPerWeek': 'days per week',
-    'home.avgLevel': 'Avg. Level',
-    'home.today': 'Today',
-    'home.doneToday': 'Already completed today — great job! 💚',
-    'home.playAgain': '✓ Practice Again',
-    'home.workouts': 'Workouts',
-    'home.weeks': 'Weeks',
-    'home.intensity': 'Intensity',
-    'home.scienceBadge': 'How the routine works',
-    'home.quote': '♥ Your consistency today is your result tomorrow. ♥',
-
-    // Calendar
-    'calendar.title': '📅 Schedule',
-    'calendar.reset': 'Reset Progress',
-    'calendar.days': ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-
-    // Onboarding
-    'ob.step.of': 'Step {0} of {1}',
-    'ob.welcome.title': 'Welcome!',
-    'ob.welcome.sub': "Let's set up your Pilates routine.",
-    'ob.name.label': 'What should we call you?',
-    'ob.name.placeholder': 'Your name...',
-    'ob.gender.title': 'What is your gender?',
-    'ob.gender.sub': 'We tailor the exercises based on this.',
-    'ob.gender.f': 'Female',
-    'ob.gender.m': 'Male',
-    'ob.gender.n': 'Prefer not to say',
-    'ob.goals.title': 'What do you want to work on',
-    'ob.goals.sub': 'Choose one or more focus areas.',
-    'ob.goals.legs': 'Glutes & Legs',
-    'ob.goals.core': 'Core, Abs & Arms',
-    'ob.goals.back': 'Back & Posture',
-    'ob.goals.all': 'Everything',
-    'ob.level.title': 'What is your starting level?',
-    'ob.level.sub': 'We will slowly build up the intensity from here.',
-    'ob.level.beg.title': 'Beginner (Easy)',
-    'ob.level.beg.desc': 'Start off slowly.',
-    'ob.level.int.title': 'Intermediate',
-    'ob.level.int.desc': 'You have some experience.',
-    'ob.level.adv.title': 'Advanced',
-    'ob.level.adv.desc': 'Ready for a challenge!',
-    'ob.time.title': 'Time & Frequency',
-    'ob.time.sub': 'How much time per day and how often per week?',
-    'ob.time.minLabel': 'Minutes per day',
-    'ob.time.daysLabel': 'Days per week',
-    'ob.start.title': 'When are you starting?',
-    'ob.start.sub': 'The routine will start on this date.',
-    'ob.btn.start': 'Start! 🎉',
-
-    // Settings
-    'set.title': 'Settings',
-    'set.name': 'Name',
-    'set.startDate': 'Routine Start Date',
-    'set.lvl.core': 'Level Core, Abs & Arms',
-    'set.lvl.legs': 'Level Glutes & Legs',
-    'set.lvl.back': 'Level Back & Posture',
-    'set.gender': 'Gender',
-    'set.goals': 'Focus Areas',
-    'set.stretch': 'Include stretch',
-    'set.resetAll': 'Reset Everything & Start Over',
-    'set.language': 'Language',
-    'set.theme': 'Theme',
-    'set.theme.light': 'Light',
-    'set.theme.dark': 'Dark',
-    'set.theme.auto': 'Auto',
-
-    // Workout
-    'wk.nextSection': 'Next section',
-    'wk.hold': '🔒 Hold it!',
-    'wk.ofReps': 'of {0} reps',
-    'wk.tapHint': 'Slow: ±4 sec. per rep',
-    'wk.tut.tooFast': 'Too fast! Maintain Time Under Tension (TUT).',
-    'wk.seconds': 'seconds',
-    'wk.intro.encouragement1': "Let's begin, {0}! 🌿",
-    'wk.intro.encouragement2': 'Great job, {0}! 💪',
-    'wk.intro.encouragement3': 'Ready for the next one? 🔥',
-    'wk.intro.encouragement4': "You're doing amazing! 🌟",
-    'wk.intro.btn': "Let's go →",
-
-    // Complete
-    'comp.title': 'Routine Completed!',
-    'comp.msg1': 'Amazing job, {0}! Your body thanks you. 💚',
-    'comp.msg2': 'Another workout in the bag! A little stronger every day.',
-    'comp.msg3': 'Fantastic! Consistency is key. 🔑',
-    'comp.workoutsTotal': 'Total Workouts',
-    'comp.currentWeek': 'Current',
-    'comp.btn.home': 'Back to Home',
-    'comp.btn.leaderboard': 'View Leaderboard 🏆',
-
-    // Community
-    'comm.title': 'Community 🏆',
-    'comm.logout': 'Logout',
-    'comm.inviteCopy': '🔗 Copy Invite Link',
-    'comm.inviteCopied': '✓ Copied!',
-    'comm.newGroup': '➕ New Group',
-    'comm.loading': 'Loading...',
-    'comm.empty': 'No one in this group yet.',
-    'comm.you': '(You)',
-    'comm.week': 'Week',
-    'comm.lastActive': 'Last active:',
-    'comm.missed': 'missed',
-
-    // Auth
-    'auth.title': 'Join the Community',
-    'auth.sub1': 'Log in to compare your progress, work out with friends in private groups, and stay motivated.',
-    'auth.sub2': 'Log in to accept the invite for group <b>{0}</b>!',
-    'auth.google': 'Continue with Google',
-    'auth.or': 'or',
-    'auth.email': 'Email Address',
-    'auth.pass': 'Password',
-    'auth.loginBtn': 'Login',
-    'auth.regBtn': 'Register',
-
-    // Dialogs
-    'dlg.quit.title': 'Quit routine?',
-    'dlg.quit.msg': 'Your progress for this workout will be lost.',
-    'dlg.quit.confirm': 'Continue Workout',
-    'dlg.quit.cancel': 'Quit', 
-    'dlg.reset.title': 'Reset progress?',
-    'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
-    'dlg.resetAll.title': 'Reset everything?',
-    'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
-    'dlg.science.title': '🧘 Routine Principles',
-    'dlg.science.msg': 'This routine utilizes a <b>controlled rep tempo</b> and <b>gradual progression</b>.<br><br><b>Controlled Tempo:</b> Moving with control helps focus on balance, posture, and muscle engagement.<br><b>Gradual Progression:</b> The program steps up intensity gradually to challenge your muscles safely.<br><br>Fast clicking is paused to encourage mindful execution.',
-
-    // Workout skip/fail
-    'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',
-    'wk.notCompleted.title': 'Not Completed',
-    'wk.notCompleted.msg': 'You skipped more than half of the exercises. This workout does not count towards your progress.',
-
-    // Community prompts
-    'comm.createPrompt': 'Name:',
-    'comm.createSuccess.title': 'Group created!',
-    'comm.createSuccess.msg': 'Share the invite link with your friends.',
-    'comm.createError': 'Error creating group.',
-    'auth.fieldsRequired': 'Please enter your email and password.',
-
-    // Settings level labels
-    'set.lvl.0': 'Off (Do not train)',
-    'set.lvl.1': 'Beginner (Easy)',
-    'set.lvl.2': 'Beginner+',
-    'set.lvl.3': 'Light Intermediate',
-    'set.lvl.4': 'Intermediate',
-    'set.lvl.5': 'Intermediate+',
-    'set.lvl.6': 'Advanced',
-    'set.lvl.7': 'Advanced+',
-    'set.lvl.8': 'Expert',
-  }
-};
-
-export function getLanguage() {
-  const profile = getProfile();
-  return profile?.language || 'nl';
-}
-
-export function t(key, ...args) {
-  const lang = getLanguage();
-  let text = translations[lang][key] || translations['nl'][key] || key;
-  
-  if (args && args.length > 0) {
-    args.forEach((arg, i) => {
-      text = text.replace(`{${i}}`, arg);
-    });
-  }
-  return text;
-}
-
-```
-
-## Bestand: src/utils/bluetooth.js
-```js
-import { BleClient } from '@capacitor-community/bluetooth-le';
-
-const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
-const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
-
-export function isPlausibleHeartRate(value) {
-  return Number.isInteger(value) && value >= 30 && value <= 240;
-}
-
-/**
- * Connects to a Bluetooth Low Energy Heart Rate Monitor.
- * Requests the user to select a device broadcasting the Heart Rate Service.
- * @param {Function} onHeartRateUpdate Callback fired when a new BPM is received.
- * @param {Function} onDisconnect Callback fired when the device disconnects.
- * @returns {Promise<string>} The device ID of the connected monitor.
- */
-export async function connectHeartRateMonitor(onHeartRateUpdate, onDisconnect) {
-  try {
-    // Initialize the BLE client (requests necessary permissions on Android/iOS)
-    await BleClient.initialize();
-
-    // Request device that broadcasts the HR service
-    const device = await BleClient.requestDevice({
-      services: [HEART_RATE_SERVICE],
-    });
-
-    // Connect to the device
-    await BleClient.connect(device.deviceId, (disconnectedDeviceId) => {
-      console.log(`Smartwatch disconnected: ${disconnectedDeviceId}`);
-      if (onDisconnect) onDisconnect();
-    });
-
-    // Start receiving notifications
-    await BleClient.startNotifications(
-      device.deviceId,
-      HEART_RATE_SERVICE,
-      HEART_RATE_MEASUREMENT,
-      (value) => {
-        // Parse the characteristic value according to GATT specifications
-        // Value is a DataView. The first byte contains flags.
-        const flags = value.getUint8(0);
-        // If the 0th bit is 0, heart rate format is 8-bit (UINT8)
-        // If 1, format is 16-bit (UINT16)
-        const is16BitFormat = flags & 0x01;
-        
-        let heartRate;
-        if (is16BitFormat) {
-          heartRate = value.getUint16(1, true); // true for little-endian
-        } else {
-          heartRate = value.getUint8(1);
-        }
-        
-        if (isPlausibleHeartRate(heartRate)) {
-          onHeartRateUpdate(heartRate);
-        } else {
-          console.warn('Ignoring implausible BPM:', heartRate);
-        }
-      }
-    );
-    
-    return device.deviceId;
-  } catch (error) {
-    console.error("Bluetooth connection failed:", error);
-    throw error;
-  }
-}
-
-/**
- * Disconnects from the connected Heart Rate Monitor.
- * @param {string} deviceId The device ID to disconnect from.
- */
-export async function disconnectHeartRateMonitor(deviceId) {
-  if (!deviceId) return;
-  try {
-    await BleClient.disconnect(deviceId);
-    console.log(`Disconnected from ${deviceId}`);
-  } catch (error) {
-    console.error("Failed to disconnect:", error);
-  }
-}
-
-```
-
-## Bestand: src/utils/firebase.js
-```js
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Cloud Firestore and get a reference to the service
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-
-```
+`
 
 ## Bestand: src/ui/core.js
-```js
+`javascript
 import { state } from '../state.js';
 import { renderOnboarding } from './screens/onboardingScreen.js';
 import { renderHome } from './screens/homeScreen.js';
@@ -5265,10 +5259,10 @@ export function playBeep() {
   }
 }
 
-```
+`
 
 ## Bestand: src/ui/components/navigation.js
-```js
+`javascript
 import { state } from '../../state.js';
 import { t } from '../../utils/i18n.js';
 import { render } from '../core.js';
@@ -5314,10 +5308,746 @@ export function attachBottomNavListeners() {
   });
 }
 
-```
+`
+
+## Bestand: src/ui/screens/coachScreen.js
+`javascript
+import { app, showToast, showDialog, escapeHTML, registerScreenCleanup } from '../core.js';
+import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
+import { db } from '../../utils/firebase.js';
+import { getCurrentUser } from '../../utils/auth.js';
+import { getProfile, getTotalCompleted } from '../../utils/storage.js';
+import { collection, query, orderBy, onSnapshot, addDoc, getDocs, limit, serverTimestamp } from 'firebase/firestore';
+import { 
+  getAIProvider, 
+  setAIProvider, 
+  getSelectedLocalModelId, 
+  setSelectedLocalModelId, 
+  AVAILABLE_LOCAL_MODELS, 
+  checkWebGPUSupport, 
+  generateAIResponse,
+  analyzeVideoForm
+} from '../../utils/aiService.js';
+
+let unsubscribeChat = null;
+
+export function renderCoach() {
+  if (unsubscribeChat) {
+    unsubscribeChat();
+    unsubscribeChat = null;
+  }
+
+  const currentProvider = getAIProvider();
+  const currentModelId = getSelectedLocalModelId();
+
+  app.innerHTML = `
+    <div class="screen coach-screen">
+      <div class="screen__header">
+        <h1 class="screen__title">Kiné Coach</h1>
+        <p class="screen__subtitle">Your private concierge & feedback.</p>
+      </div>
+
+      <div class="screen__content">
+        <!-- Premium Video Form Check Card -->
+        <div class="coach__premium-card" id="coach-form-check-card">
+          <div class="coach__premium-icon">✨</div>
+          <div class="coach__premium-text">
+            <h2 class="coach__premium-title">Upload Video Form Check</h2>
+            <p class="coach__premium-desc">Upload een video of foto van je Pilates oefening voor gepersonaliseerde, anatomische feedback via Gemini Multimodal AI.</p>
+          </div>
+          <button class="btn btn--primary coach__upload-btn" id="coach-upload-video-btn">
+            🎥 Upload Video / Foto
+          </button>
+          <input type="file" id="form-check-file-input" accept="video/*,image/*" style="display: none;" />
+        </div>
+
+        <!-- AI Engine Bar -->
+        <div class="coach__engine-bar" id="coach-engine-bar">
+          <div class="coach__engine-info">
+            <span class="coach__engine-icon">${currentProvider === 'local' ? '📱' : '☁️'}</span>
+            <div class="coach__engine-details">
+              <span class="coach__engine-title">${currentProvider === 'local' ? 'Lokale LLM (On-Device)' : 'Google Gemini (Cloud)'}</span>
+              <span class="coach__engine-subtext" id="engine-subtext">
+                ${currentProvider === 'local' ? getModelName(currentModelId) : 'Vereist internet & API-sleutel'}
+              </span>
+            </div>
+          </div>
+          <button class="btn btn--secondary coach__engine-btn" id="coach-engine-settings-btn">
+            ⚙️ AI Kies
+          </button>
+        </div>
+
+        <!-- Download / Processing Progress Bar -->
+        <div class="coach__download-card" id="coach-download-card" style="display: none;">
+          <div class="coach__download-header">
+            <span class="coach__download-title" id="download-status-title">Model downloaden...</span>
+            <span class="coach__download-pct" id="download-status-pct">0%</span>
+          </div>
+          <div class="coach__progress-bar">
+            <div class="coach__progress-fill" id="download-progress-fill" style="width: 0%;"></div>
+          </div>
+          <p class="coach__download-detail" id="download-status-detail">Bestanden worden verwerkt...</p>
+        </div>
+
+        <div class="coach__chat" id="coach-chat-container">
+          <div class="coach__loading">Connecting to Kiné Coach...</div>
+        </div>
+      </div>
+
+      <div class="coach__input-area">
+        <button class="coach__media-btn" id="coach-media-btn" title="Upload Video voor Form Check" aria-label="Upload video of foto voor Form Check">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+        </button>
+        <input type="text" class="coach__input" id="coach-input" placeholder="Message your coach..." aria-label="Bericht voor Kiné Coach" />
+        <button class="coach__send-btn" id="coach-send" aria-label="Verstuur bericht">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+
+      <!-- Modal voor AI Selector -->
+      <div class="modal" id="ai-settings-modal" style="display: none;">
+        <div class="modal__content coach__modal-content">
+          <div class="modal__header">
+            <h3>AI Engine & Model Selectie</h3>
+            <button class="modal__close" id="ai-modal-close">&times;</button>
+          </div>
+          <div class="modal__body">
+            <p style="font-size: 0.9rem; color: var(--color-text-secondary); margin-bottom: 1rem;">
+              Kies hoe je AI Kiné Coach wil uitvoeren op je apparaat voor tekst-chat.
+            </p>
+
+            <div class="coach__option-group">
+              <label class="coach__radio-card ${currentProvider === 'cloud' ? 'coach__radio-card--selected' : ''}" id="option-cloud">
+                <input type="radio" name="ai_provider_radio" value="cloud" ${currentProvider === 'cloud' ? 'checked' : ''} />
+                <div class="coach__radio-content">
+                  <strong>☁️ Google Gemini Cloud (Aanbevolen)</strong>
+                  <p>Directe antwoorden & Vorm Check. Lichtgewicht (0 MB download).</p>
+                </div>
+              </label>
+
+              <label class="coach__radio-card ${currentProvider === 'local' ? 'coach__radio-card--selected' : ''}" id="option-local">
+                <input type="radio" name="ai_provider_radio" value="local" ${currentProvider === 'local' ? 'checked' : ''} />
+                <div class="coach__radio-content">
+                  <strong>📱 Lokale LLM (On-Device via WebGPU)</strong>
+                  <p>100% lokaal & privé. ⚠️ Vereist eenmalige download van 0.35 - 1.9 GB en WebGPU ondersteuning op je mobiel.</p>
+                </div>
+              </label>
+            </div>
+
+            <div class="coach__local-models-section" id="local-models-section" style="${currentProvider === 'local' ? 'display: block;' : 'display: none;'}">
+              <h4 style="margin-top: 1.2rem; margin-bottom: 0.5rem;">Kies Lokaal Model (Llama 3.2 / DeepSeek R1 / Gemma 2 / Qwen 2.5)</h4>
+              <div class="coach__model-list">
+                ${AVAILABLE_LOCAL_MODELS.map(m => `
+                  <div class="coach__model-card ${currentModelId === m.id ? 'coach__model-card--selected' : ''}" data-model-id="${m.id}">
+                    <div class="coach__model-main">
+                      <strong>${escapeHTML(m.name)}</strong>
+                      <div>
+                        ${m.badge ? `<span class="coach__model-badge">${escapeHTML(m.badge)}</span>` : ''}
+                        <span class="coach__model-tag">${escapeHTML(m.size)}</span>
+                      </div>
+                    </div>
+                    <p class="coach__model-desc">${escapeHTML(m.desc)}</p>
+                    <span class="coach__model-ram">RAM advies: ${escapeHTML(m.recommendedRAM)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="modal__footer" style="margin-top: 1.5rem; text-align: right;">
+              <button class="btn btn--primary" id="ai-settings-save">Opslaan & Gebruiken</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${getBottomNavHTML('coach')}
+  `;
+
+  attachBottomNavListeners();
+
+  const user = getCurrentUser();
+  if (!user) {
+    document.getElementById('coach-chat-container').innerHTML = `
+      <div class="coach__message coach__message--received">
+        <div class="coach__avatar">F</div>
+        <div class="coach__bubble">Please log in to use the Kiné AI Coach.</div>
+      </div>`;
+    return;
+  }
+
+  // Setup Firebase Firestore chat stream
+  const chatRef = collection(db, 'users', user.uid, 'chats');
+  const q = query(chatRef, orderBy('createdAt', 'asc'));
+
+  unsubscribeChat = onSnapshot(q, (snapshot) => {
+    const container = document.getElementById('coach-chat-container');
+    if (!container) return;
+
+    if (snapshot.empty) {
+      container.innerHTML = `
+        <div class="coach__message coach__message--received">
+          <div class="coach__avatar">F</div>
+          <div class="coach__bubble">
+            Welcome to Kiné Premium. How can I assist you with your routine today?
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const isUser = data.role === 'user';
+      html += `
+        <div class="coach__message ${isUser ? 'coach__message--sent' : 'coach__message--received'}">
+          ${!isUser ? '<div class="coach__avatar">F</div>' : ''}
+          <div class="coach__bubble">
+            ${escapeHTML(data.text || '').replace(/\n/g, '<br>')}
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+
+    setTimeout(() => {
+      const chatContainer = document.getElementById('coach-chat-container');
+      if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
+    }, 50);
+  });
+
+  // Event Listeners voor AI Selector Modal
+  const settingsBtn = document.getElementById('coach-engine-settings-btn');
+  const modal = document.getElementById('ai-settings-modal');
+  const modalClose = document.getElementById('ai-modal-close');
+  const modalSave = document.getElementById('ai-settings-save');
+
+  const optionCloud = document.getElementById('option-cloud');
+  const optionLocal = document.getElementById('option-local');
+  const localModelsSection = document.getElementById('local-models-section');
+
+  if (settingsBtn && modal) {
+    settingsBtn.addEventListener('click', () => { modal.style.display = 'flex'; });
+  }
+
+  if (modalClose && modal) {
+    modalClose.addEventListener('click', () => { modal.style.display = 'none'; });
+  }
+
+  const radios = document.querySelectorAll('input[name="ai_provider_radio"]');
+  radios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const isLocal = e.target.value === 'local';
+      localModelsSection.style.display = isLocal ? 'block' : 'none';
+      optionCloud.classList.toggle('coach__radio-card--selected', !isLocal);
+      optionLocal.classList.toggle('coach__radio-card--selected', isLocal);
+    });
+  });
+
+  let selectedModelInModal = currentModelId;
+  const modelCards = document.querySelectorAll('.coach__model-card');
+  modelCards.forEach(card => {
+    card.addEventListener('click', () => {
+      modelCards.forEach(c => c.classList.remove('coach__model-card--selected'));
+      card.classList.add('coach__model-card--selected');
+      selectedModelInModal = card.dataset.modelId;
+    });
+  });
+
+  if (modalSave) {
+    modalSave.addEventListener('click', async () => {
+      const chosenProvider = document.querySelector('input[name="ai_provider_radio"]:checked').value;
+      setAIProvider(chosenProvider);
+      setSelectedLocalModelId(selectedModelInModal);
+
+      if (chosenProvider === 'local') {
+        const gpuCheck = await checkWebGPUSupport();
+        if (!gpuCheck.supported) {
+          showToast(gpuCheck.reason, 'error');
+          setAIProvider('cloud');
+          renderCoach();
+          return;
+        }
+      }
+
+      modal.style.display = 'none';
+      showToast(`AI Engine ingesteld op: ${chosenProvider === 'local' ? 'Lokale LLM' : 'Google Gemini Cloud'}`);
+      renderCoach();
+    });
+  }
+
+  // Video Upload & Form Check Handler
+  const fileInput = document.getElementById('form-check-file-input');
+  const uploadBtn = document.getElementById('coach-upload-video-btn');
+  const mediaBtn = document.getElementById('coach-media-btn');
+
+  const triggerUpload = () => {
+    if (fileInput) fileInput.click();
+  };
+
+  if (uploadBtn) uploadBtn.addEventListener('click', triggerUpload);
+  if (mediaBtn) mediaBtn.addEventListener('click', triggerUpload);
+
+  if (fileInput) {
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      fileInput.value = '';
+
+      showDialog(
+        '🔒 Privacy & AI Form Check',
+        'Vier stilstaande beelden uit je bestand worden verwerkt door Google Gemini AI voor anatomische feedback. Zorg dat er geen gevoelige beelden van derden zichtbaar zijn. Wil je doorgaan met de analyse?',
+        'Ja, verwerk beelden',
+        'Annuleren',
+        async () => {
+          const isVideo = file.type.startsWith('video/');
+          const fileLabel = isVideo ? '🎥 [Videobestand geüpload voor Vorm-check]' : '📷 [Afbeelding geüpload voor Vorm-check]';
+
+          try {
+            await addDoc(chatRef, {
+              role: 'user',
+              text: fileLabel,
+              createdAt: serverTimestamp()
+            });
+
+        const downloadCard = document.getElementById('coach-download-card');
+        const downloadTitle = document.getElementById('download-status-title');
+        const downloadPct = document.getElementById('download-status-pct');
+        const downloadFill = document.getElementById('download-progress-fill');
+        const downloadDetail = document.getElementById('download-status-detail');
+
+        if (downloadCard) {
+          downloadCard.style.display = 'block';
+          downloadTitle.innerText = 'Video / Foto analyseren...';
+          downloadPct.innerText = '10%';
+          downloadFill.style.width = '10%';
+          downloadDetail.innerText = 'Sleutelframes worden verwerkt...';
+        }
+
+        const chatContainer = document.getElementById('coach-chat-container');
+        if (chatContainer) {
+          const typingDiv = document.createElement('div');
+          typingDiv.className = 'coach__typing';
+          typingDiv.id = 'coach-typing-indicator';
+          typingDiv.innerText = 'Kiné Gemini Multimodal is de houding aan het analyseren...';
+          chatContainer.appendChild(typingDiv);
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        const feedback = await analyzeVideoForm({
+          file: file,
+          exerciseName: 'Pilates Routine',
+          onProgress: (text, pct) => {
+            if (downloadCard) {
+              downloadTitle.innerText = 'Kiné Form Check verwerken...';
+              downloadPct.innerText = `${pct}%`;
+              downloadFill.style.width = `${pct}%`;
+              downloadDetail.innerText = text;
+            }
+          }
+        });
+
+        if (downloadCard) downloadCard.style.display = 'none';
+        const indicator = document.getElementById('coach-typing-indicator');
+        if (indicator) indicator.remove();
+
+        const reportText = `✨ Kiné Anatomische Form Check Rapport:\n\n${feedback}`;
+        await addDoc(chatRef, {
+          role: 'model',
+          text: reportText,
+          createdAt: serverTimestamp()
+        });
+
+        showToast('Form Check analyse voltooid!', 'success');
+
+      } catch (err) {
+        console.error(err);
+        const downloadCard = document.getElementById('coach-download-card');
+        if (downloadCard) downloadCard.style.display = 'none';
+
+        const indicator = document.getElementById('coach-typing-indicator');
+        if (indicator) indicator.remove();
+
+        await addDoc(chatRef, {
+          role: 'model',
+          text: `Fout bij Vorm-Check analyse: ${err.message}`,
+          createdAt: serverTimestamp()
+        });
+        showToast(`Video-analyse mislukt: ${err.message}`, 'error');
+      }
+    });
+  });
+}
+
+  // Send Message Logic
+  const sendBtn = document.getElementById('coach-send');
+  const input = document.getElementById('coach-input');
+
+  registerScreenCleanup('coach', () => {
+    if (unsubscribeChat) {
+      unsubscribeChat();
+      unsubscribeChat = null;
+    }
+  });
+
+  const sendMessage = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+
+    try {
+      // Fetch previous chat history BEFORE adding current prompt to avoid prompt duplication in context
+      const qContext = query(chatRef, orderBy('createdAt', 'desc'), limit(6));
+      const contextSnap = await getDocs(qContext);
+      const history = [];
+      contextSnap.forEach(doc => {
+        const d = doc.data();
+        history.unshift({
+          role: d.role === 'user' ? 'user' : 'model',
+          parts: [{ text: d.text }]
+        });
+      });
+
+      await addDoc(chatRef, {
+        role: 'user',
+        text: text,
+        createdAt: serverTimestamp()
+      });
+
+      const chatContainer = document.getElementById('coach-chat-container');
+      if (chatContainer) {
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'coach__typing';
+        typingDiv.id = 'coach-typing-indicator';
+        typingDiv.innerText = getAIProvider() === 'local' ? 'Lokale AI denkt na...' : 'Kiné Coach is typing...';
+        chatContainer.appendChild(typingDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      const profile = getProfile();
+      const completed = getTotalCompleted();
+      const userContext = `De gebruiker heet ${profile.name || 'deze sporter'} en heeft als doel ${profile.goals ? profile.goals.join(' en ') : 'fit worden'}. Ze hebben tot nu toe ${completed} workouts voltooid.`;
+      const systemInstruction = `Je bent Kiné Coach, een high-end AI fitness en Pilates coach in een exclusieve app. Geef korte, professionele en aanmoedigende antwoorden in het Nederlands. Maximaal 2-3 zinnen. Context: ${userContext}`;
+
+      const downloadCard = document.getElementById('coach-download-card');
+      const downloadTitle = document.getElementById('download-status-title');
+      const downloadPct = document.getElementById('download-status-pct');
+      const downloadFill = document.getElementById('download-progress-fill');
+      const downloadDetail = document.getElementById('download-status-detail');
+
+      const replyText = await generateAIResponse({
+        prompt: text,
+        history: history,
+        systemInstruction: systemInstruction,
+        onProgress: (progressText, pct) => {
+          if (downloadCard) {
+            downloadCard.style.display = 'block';
+            downloadTitle.innerText = 'Lokale LLM Laden / Downloaden...';
+            downloadPct.innerText = `${pct}%`;
+            downloadFill.style.width = `${pct}%`;
+            downloadDetail.innerText = progressText;
+          }
+        }
+      });
+
+      if (downloadCard) downloadCard.style.display = 'none';
+      const indicator = document.getElementById('coach-typing-indicator');
+      if (indicator) indicator.remove();
+
+      await addDoc(chatRef, {
+        role: 'model',
+        text: replyText,
+        createdAt: serverTimestamp()
+      });
+
+    } catch (e) {
+      const downloadCard = document.getElementById('coach-download-card');
+      if (downloadCard) downloadCard.style.display = 'none';
+
+      const indicator = document.getElementById('coach-typing-indicator');
+      if (indicator) indicator.remove();
+
+      console.error(e);
+      await addDoc(chatRef, {
+        role: 'model',
+        text: `Fout (${getAIProvider() === 'local' ? 'Lokaal Model' : 'Gemini Cloud'}): ${e.message}`,
+        createdAt: serverTimestamp()
+      });
+    }
+  };
+
+  if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+  if (input) input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+}
+
+function getModelName(id) {
+  const found = AVAILABLE_LOCAL_MODELS.find(m => m.id === id);
+  return found ? found.name : id;
+}
+
+`
+
+## Bestand: src/ui/screens/communityScreen.js
+`javascript
+import { state } from '../../state.js';
+import { app, render, showPrompt, showDialog, showToast, escapeHTML } from '../core.js';
+import { loginWithGoogle, loginWithEmail, registerWithEmail, logout } from '../../utils/auth.js';
+import { getLeaderboard, createCommunity, getUserCommunities, pushUserProgress } from '../../utils/social.js';
+import { getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from '../../utils/storage.js';
+import { t } from '../../utils/i18n.js';
+import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
+
+export function renderCommunityWrapper() {
+  if (state.authLoading) {
+    app.innerHTML = `<div class="screen community"><div class="community__loading">${t('comm.loading')}</div></div>`;
+    return;
+  }
+
+  if (!state.currentUser) {
+    renderLoginScreen();
+  } else {
+    renderCommunity();
+  }
+}
+
+function renderLoginScreen() {
+  const inviteCode = localStorage.getItem('pilates_pending_invite');
+  app.innerHTML = `
+    <div class="screen auth-screen">
+      <div class="settings__header">
+        <button class="settings__back-btn" id="auth-back">${t('btn.back')}</button>
+      </div>
+      <div class="auth__container">
+        <div class="auth__icon">🏆</div>
+        <h2 class="auth__title">${t('auth.title')}</h2>
+        <p class="auth__subtitle">
+          ${inviteCode ? t('auth.sub2', escapeHTML(inviteCode)) : t('auth.sub1')}
+        </p>
+        
+        <button class="auth__btn auth__btn--google" id="login-google">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 15.02 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          ${t('auth.google')}
+        </button>
+
+        <div class="auth__divider">${t('auth.or')}</div>
+
+        <form class="auth__form" id="email-form">
+          <input type="email" class="settings__input" id="auth-email" placeholder="${t('auth.email')}" required />
+          <input type="password" class="settings__input" id="auth-password" placeholder="${t('auth.pass')}" required minlength="6" />
+          <div class="auth__buttons">
+            <button type="submit" class="auth__btn auth__btn--email">${t('auth.loginBtn')}</button>
+            <button type="button" class="auth__btn auth__btn--secondary" id="register-btn">${t('auth.regBtn')}</button>
+          </div>
+          <p class="auth__error" id="auth-error"></p>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('auth-back').addEventListener('click', () => { state.screen = 'home'; render(); });
+  
+  document.getElementById('login-google').addEventListener('click', async () => {
+    const res = await loginWithGoogle();
+    if (res.error) document.getElementById('auth-error').textContent = res.error;
+  });
+
+  document.getElementById('email-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value;
+    const pass = document.getElementById('auth-password').value;
+    const res = await loginWithEmail(email, pass);
+    if (res.error) document.getElementById('auth-error').textContent = res.error;
+  });
+
+  document.getElementById('register-btn').addEventListener('click', async () => {
+    const email = document.getElementById('auth-email').value;
+    const pass = document.getElementById('auth-password').value;
+    if (!email || !pass) return document.getElementById('auth-error').textContent = t('auth.fieldsRequired');
+    const res = await registerWithEmail(email, pass);
+    if (res.error) document.getElementById('auth-error').textContent = res.error;
+  });
+}
+
+export async function loadCommunitiesAndLeaderboard() {
+  state.loadingLeaderboard = true;
+  render();
+
+  // Fallback: always push latest progress before fetching leaderboard
+  // This ensures data is synced even if the post-workout push failed
+  const profile = getProfile();
+  if (profile) {
+    await pushUserProgress({
+      name: profile.name,
+      totalWorkouts: getTotalCompleted(),
+      missedWorkouts: getMissedWorkouts(),
+      currentWeek: getCurrentWeek()
+    });
+  }
+
+  state.myCommunities = await getUserCommunities();
+  state.leaderboard = await getLeaderboard(state.activeCommunity);
+  state.loadingLeaderboard = false;
+  render();
+}
+
+function renderCommunity() {
+  app.innerHTML = `
+    <div class="screen community">
+      <div class="settings__header">
+        <h2 class="settings__title">${t('comm.title')}</h2>
+        <button class="settings__back-btn" id="logout-btn" style="color:var(--rose-dark)">${t('comm.logout')}</button>
+      </div>
+
+      <div class="community__tabs">
+        ${state.myCommunities.map(c => `
+          <button class="community__tab ${state.activeCommunity === c.id ? 'community__tab--active' : ''}" data-cid="${c.id}">
+            ${escapeHTML(c.name)}
+          </button>
+        `).join('')}
+      </div>
+      
+      <div class="community__actions">
+        ${state.activeCommunity !== 'global' ? `
+          <button class="community__action-btn" id="invite-btn">${t('comm.inviteCopy')}</button>
+        ` : ''}
+        <button class="community__action-btn" id="create-group-btn">${t('comm.newGroup')}</button>
+      </div>
+
+      <div class="community__leaderboard">
+        ${state.loadingLeaderboard ? `<div class="community__loading">${t('comm.loading')}</div>` : `
+          ${state.leaderboard.length === 0 ? `<div class="community__empty">${t('comm.empty')}</div>` : `
+            ${state.leaderboard.map((user, index) => {
+              const rankColor = index===0 ? 'var(--gold)' : index===1 ? 'var(--silver)' : index===2 ? 'var(--bronze)' : 'var(--sage)';
+              return `
+              <div class="community__user">
+                <div class="community__rank" style="color: ${rankColor}">${index + 1}</div>
+                <div class="community__user-info">
+                  <div class="community__user-name">${escapeHTML(user.name)} ${user.id === state.currentUser.uid ? t('comm.you') : ''}</div>
+                  <div class="community__user-meta">${t('comm.week')} ${user.currentWeek} · ${t('comm.lastActive')} ${user.lastActive}</div>
+                  ${user.missedWorkouts > 0 ? `<div class="community__user-meta" style="color: var(--rose-dark);">😴 ${user.missedWorkouts} ${t('comm.missed')}</div>` : ''}
+                </div>
+                <div class="community__user-score">
+                  <span class="community__score-value">${user.totalWorkouts}</span>
+                  <span class="community__score-label">${t('home.workouts')}</span>
+                </div>
+              </div>
+              `;
+            }).join('')}
+          `}
+        `}
+      </div>
+      
+      </div>
+      ${getBottomNavHTML('community')}
+    `;
+
+  attachBottomNavListeners();
+  document.getElementById('logout-btn').addEventListener('click', async () => { await logout(); });
+
+  document.querySelectorAll('.community__tab').forEach(tab => {
+    tab.addEventListener('click', async () => {
+      state.activeCommunity = tab.dataset.cid;
+      await loadCommunitiesAndLeaderboard();
+    });
+  });
+
+  const inviteBtn = document.getElementById('invite-btn');
+  if (inviteBtn) {
+    inviteBtn.addEventListener('click', () => {
+      const baseUrl = import.meta.env.VITE_APP_URL || 'https://pilates-22dcd.web.app';
+      const link = `${baseUrl}/?invite=${state.activeCommunity}`;
+      navigator.clipboard.writeText(link);
+      inviteBtn.textContent = t('comm.inviteCopied');
+      setTimeout(() => inviteBtn.textContent = t('comm.inviteCopy'), 2000);
+    });
+  }
+
+  document.getElementById('create-group-btn').addEventListener('click', () => {
+    showPrompt(
+      t('comm.newGroup'),
+      t('comm.createPrompt'),
+      t('btn.confirm'),
+      t('btn.cancel'),
+      (name) => {
+        if (name && name.trim()) {
+          createCommunity(name.trim()).then(async (code) => {
+            state.activeCommunity = code;
+            await loadCommunitiesAndLeaderboard();
+            showDialog(t('comm.createSuccess.title'), t('comm.createSuccess.msg'), t('btn.confirm'), null, () => {});
+          }).catch(err => showToast(err.message || t('comm.createError'), 'error'));
+        }
+      }
+    );
+  });
+}
+
+`
+
+## Bestand: src/ui/screens/completeScreen.js
+`javascript
+import { state } from '../../state.js';
+import { app, render } from '../core.js';
+import { getUserName, getTotalCompleted, getCurrentWeek } from '../../utils/storage.js';
+import { loadCommunitiesAndLeaderboard } from './communityScreen.js';
+import { t } from '../../utils/i18n.js';
+
+export function renderComplete() {
+  const name = getUserName();
+  const n = name ? name : '';
+  const totalCompleted = getTotalCompleted();
+  const currentWeek = getCurrentWeek();
+
+
+  const messages = [
+    t('comp.msg1', n),
+    t('comp.msg2', n),
+    t('comp.msg3', n),
+  ];
+  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+
+  app.innerHTML = `
+    <div class="screen complete" id="complete-screen">
+      <div class="complete__celebration">🎉</div>
+      <h2 class="complete__title">${t('comp.title')}</h2>
+      <p class="complete__message">${randomMessage}</p>
+
+      <div class="complete__stats">
+        <div class="complete__stat">
+          <div class="complete__stat-value">${totalCompleted}</div>
+          <div class="complete__stat-label">${t('comp.workoutsTotal')}</div>
+        </div>
+        <div class="complete__stat">
+          <div class="complete__stat-value">${t('comm.week')} ${currentWeek}</div>
+          <div class="complete__stat-label">${t('comp.currentWeek')}</div>
+        </div>
+      </div>
+
+      <button class="complete__home-btn" id="home-btn">${t('comp.btn.home')}</button>
+      <button class="complete__community-btn" id="goto-community-btn">${t('comp.btn.leaderboard')}</button>
+    </div>
+  `;
+
+  document.getElementById('home-btn').addEventListener('click', () => {
+    state.justFinishedWorkout = true;
+    state.screen = 'home';
+    render();
+  });
+  document.getElementById('goto-community-btn').addEventListener('click', () => {
+    state.screen = 'community';
+    render();
+    if (state.currentUser) {
+      loadCommunitiesAndLeaderboard();
+    }
+  });
+}
+
+`
 
 ## Bestand: src/ui/screens/homeScreen.js
-```js
+`javascript
 import { state } from '../../state.js';
 import { app, render, escapeHTML, showDialog } from '../core.js';
 import { getProfile, getUserName, isTodayComplete, getTotalCompleted, getCurrentWeek, getProgramStartDate, buildCalendarData, resetProgress } from '../../utils/storage.js';
@@ -5531,10 +6261,431 @@ function handleReset() {
 
 import { startWorkout } from './workoutScreen.js';
 
-```
+`
+
+## Bestand: src/ui/screens/onboardingScreen.js
+`javascript
+import { state } from '../../state.js';
+import { app, render, escapeHTML } from '../core.js';
+import { saveProfile, formatDate } from '../../utils/storage.js';
+import { t, getLanguage } from '../../utils/i18n.js';
+
+export function renderOnboarding() {
+  const step = state.onboardingStep || 0;
+  const data = state.onboardingData || { name: '', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: formatDate(new Date()), baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } };
+  state.onboardingData = data;
+
+  const steps = [
+    renderStep0, // name
+    renderStep2, // level
+    renderStep3, // time & days
+    renderStep4, // start date
+  ];
+
+  app.innerHTML = `
+    <div class="screen onboarding" id="onboarding-screen">
+      <div class="onboarding__progress">
+        <div class="onboarding__progress-bar" style="width: ${((step + 1) / steps.length) * 100}%"></div>
+      </div>
+      <div class="onboarding__step-indicator">${t('ob.step.of', step + 1, steps.length)}</div>
+      
+      ${steps[step]()}
+
+      <div class="onboarding__nav">
+        ${step > 0 ? `<button class="onboarding__btn onboarding__btn--secondary" id="ob-prev">${t('btn.back')}</button>` : '<div></div>'}
+        <button class="onboarding__btn" id="ob-next" ${!canProceed(step, data) ? 'disabled' : ''}>
+          ${step === steps.length - 1 ? t('ob.btn.start') : t('btn.next')}
+        </button>
+      </div>
+    </div>
+  `;
+
+  attachOnboardingListeners(step, steps.length);
+}
+
+function renderStep0() {
+  return `
+    <h2 class="onboarding__title">${t('ob.welcome.title')}</h2>
+    <p class="onboarding__subtitle">${t('ob.welcome.sub')}</p>
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('ob.name.label')}</label>
+      <input type="text" class="onboarding__input" id="ob-name" placeholder="${t('ob.name.placeholder')}" value="${escapeHTML(state.onboardingData.name)}" autofocus>
+    </div>
+  `;
+}
+
+function renderStep2() {
+  const data = state.onboardingData;
+  return `
+    <h2 class="onboarding__title">${t('ob.level.title')}</h2>
+    <p class="onboarding__subtitle">${t('ob.level.sub')}</p>
+    
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('set.lvl.core')}</label>
+      <select class="settings__input" id="ob-level-core">
+        <option value="0" ${data.baseLevels.core === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
+        <option value="1" ${data.baseLevels.core === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
+        <option value="4" ${data.baseLevels.core === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
+        <option value="6" ${data.baseLevels.core === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
+      </select>
+    </div>
+
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('set.lvl.legs')}</label>
+      <select class="settings__input" id="ob-level-benen">
+        <option value="0" ${data.baseLevels['benen-billen'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
+        <option value="1" ${data.baseLevels['benen-billen'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
+        <option value="4" ${data.baseLevels['benen-billen'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
+        <option value="6" ${data.baseLevels['benen-billen'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
+      </select>
+    </div>
+
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('set.lvl.back')}</label>
+      <select class="settings__input" id="ob-level-rug">
+        <option value="0" ${data.baseLevels['rug-houding'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
+        <option value="1" ${data.baseLevels['rug-houding'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
+        <option value="4" ${data.baseLevels['rug-houding'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
+        <option value="6" ${data.baseLevels['rug-houding'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
+      </select>
+    </div>
+  `;
+}
+
+function renderStep3() {
+  const min = state.onboardingData.dailyMinutes;
+  const days = state.onboardingData.daysPerWeek;
+  const stretch = state.onboardingData.includeStretch !== false;
+  const lang = getLanguage();
+  
+  return `
+    <h2 class="onboarding__title">${t('ob.time.title')}</h2>
+    <p class="onboarding__subtitle">${t('ob.time.sub')}</p>
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('ob.time.minLabel')}</label>
+      <div class="onboarding__options" id="ob-min-options">
+        ${renderOption('min', 10, '⏱', '10 min', min === 10)}
+        ${renderOption('min', 15, '⏱', '15 min', min === 15)}
+        ${renderOption('min', 20, '⏱', '20 min', min === 20)}
+      </div>
+    </div>
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('ob.time.daysLabel')}</label>
+      <div class="onboarding__options" id="ob-days-options">
+        ${renderOption('days', 3, '📅', '3 dgn', days === 3)}
+        ${renderOption('days', 4, '📅', '4 dgn', days === 4)}
+        ${renderOption('days', 5, '📅', '5 dgn', days === 5)}
+        ${renderOption('days', 6, '📅', '6 dgn', days === 6)}
+      </div>
+    </div>
+    <div class="onboarding__group">
+      <label class="onboarding__label">${t('set.stretch')}</label>
+      <div class="onboarding__options" id="ob-stretch-options">
+        ${renderOption('stretch', 'true', '✅', lang === 'nl' ? 'Ja' : 'Yes', stretch === true)}
+        ${renderOption('stretch', 'false', '❌', lang === 'nl' ? 'Nee' : 'No', stretch === false)}
+      </div>
+    </div>
+  `;
+}
+
+function renderStep4() {
+  const minDate = formatDate(new Date());
+  return `
+    <h2 class="onboarding__title">${t('ob.start.title')}</h2>
+    <p class="onboarding__subtitle">${t('ob.start.sub')}</p>
+    <div class="onboarding__group">
+      <input type="date" class="onboarding__input" id="ob-start-date" value="${state.onboardingData.startDate || minDate}" min="${minDate}" />
+    </div>
+  `;
+}
+
+function renderOption(type, value, emoji, label, isSelected) {
+  return `
+    <button class="onboarding__option ${isSelected ? 'onboarding__option--selected' : ''}" data-${type}="${value}">
+      <span class="onboarding__option-emoji">${emoji}</span>
+      <span class="onboarding__option-label">${label}</span>
+    </button>
+  `;
+}
+
+function canProceed(step, data) {
+  if (step === 0 && !data.name.trim()) return false;
+  return true;
+}
+
+function attachOnboardingListeners(step, totalSteps = 4) {
+  const prevBtn = document.getElementById('ob-prev');
+  const nextBtn = document.getElementById('ob-next');
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      saveStepData(step);
+      state.onboardingStep--;
+      render();
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      saveStepData(step);
+      if (step === totalSteps - 1) {
+        completeOnboarding();
+      } else {
+        state.onboardingStep++;
+        render();
+      }
+    });
+  }
+
+  if (step === 0) {
+    const input = document.getElementById('ob-name');
+    input.addEventListener('input', () => {
+      state.onboardingData.name = input.value;
+      nextBtn.disabled = !canProceed(0, state.onboardingData);
+    });
+  } else if (step === 2) {
+    document.querySelectorAll('#ob-min-options .onboarding__option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.onboardingData.dailyMinutes = parseInt(btn.dataset.min);
+        render();
+      });
+    });
+    document.querySelectorAll('#ob-days-options .onboarding__option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.onboardingData.daysPerWeek = parseInt(btn.dataset.days);
+        render();
+      });
+    });
+    document.querySelectorAll('#ob-stretch-options .onboarding__option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.onboardingData.includeStretch = btn.dataset.stretch === 'true';
+        render();
+      });
+    });
+  }
+}
+
+function saveStepData(step) {
+  if (step === 0) {
+    state.onboardingData.name = document.getElementById('ob-name').value.trim();
+  } else if (step === 2) {
+    state.onboardingData.baseLevels = {
+      core: parseInt(document.getElementById('ob-level-core').value),
+      'benen-billen': parseInt(document.getElementById('ob-level-benen').value),
+      'rug-houding': parseInt(document.getElementById('ob-level-rug').value),
+    };
+  } else if (step === 4) {
+    state.onboardingData.startDate = document.getElementById('ob-start-date').value;
+  }
+}
+
+function completeOnboarding() {
+  const finalProfile = { ...state.onboardingData, onboardingComplete: true };
+  saveProfile(finalProfile);
+  state.screen = 'home';
+  render();
+}
+
+`
+
+## Bestand: src/ui/screens/settingsScreen.js
+`javascript
+import { state } from '../../state.js';
+import { app, render, showDialog, escapeHTML } from '../core.js';
+import { getProfile, saveProfile, resetAll, formatDate } from '../../utils/storage.js';
+import { t, getLanguage } from '../../utils/i18n.js';
+import { applyTheme } from '../../main.js';
+import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
+
+export function renderSettings() {
+  const profile = getProfile() || {};
+  const lang = getLanguage();
+  const theme = profile.theme || 'auto';
+
+  app.innerHTML = `
+    <div class="screen settings">
+      <div class="settings__header">
+        <h2 class="settings__title">${t('set.title')}</h2>
+      </div>
+
+      <div class="settings__group">
+        <label class="settings__label">${t('set.name')}</label>
+        <input class="settings__input" type="text" id="set-name" value="${escapeHTML(profile.name || '')}" />
+      </div>
+
+      <div class="settings__row">
+        <div class="settings__group settings__group--half">
+          <label class="settings__label">${t('set.language')}</label>
+          <select class="settings__select" id="set-language">
+            <option value="nl" ${lang === 'nl' ? 'selected' : ''}>🇳🇱 Nederlands</option>
+            <option value="en" ${lang === 'en' ? 'selected' : ''}>🇬🇧 English</option>
+          </select>
+        </div>
+        <div class="settings__group settings__group--half">
+          <label class="settings__label">${t('set.theme')}</label>
+          <select class="settings__select" id="set-theme">
+            <option value="auto" ${theme === 'auto' ? 'selected' : ''}>🌓 ${t('set.theme.auto')}</option>
+            <option value="light" ${theme === 'light' ? 'selected' : ''}>☀️ ${t('set.theme.light')}</option>
+            <option value="dark" ${theme === 'dark' ? 'selected' : ''}>🌙 ${t('set.theme.dark')}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings__group">
+        <label class="settings__label">${t('set.startDate')}</label>
+        <input type="date" class="settings__input" id="set-date" value="${profile.startDate || formatDate(new Date())}" />
+      </div>
+
+      <div class="settings__group">
+        <label class="settings__label">${t('set.lvl.core')}</label>
+        <select class="settings__input" id="set-level-core">
+          <option value="0" ${profile.baseLevels?.core === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
+          <option value="1" ${profile.baseLevels?.core === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
+          <option value="2" ${profile.baseLevels?.core === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
+          <option value="3" ${profile.baseLevels?.core === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
+          <option value="4" ${profile.baseLevels?.core === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
+          <option value="5" ${profile.baseLevels?.core === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
+          <option value="6" ${profile.baseLevels?.core === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
+          <option value="7" ${profile.baseLevels?.core === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
+          <option value="8" ${profile.baseLevels?.core === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
+        </select>
+      </div>
+
+      <div class="settings__group">
+        <label class="settings__label">${t('set.lvl.legs')}</label>
+        <select class="settings__input" id="set-level-benen">
+          <option value="0" ${profile.baseLevels?.['benen-billen'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
+          <option value="1" ${profile.baseLevels?.['benen-billen'] === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
+          <option value="2" ${profile.baseLevels?.['benen-billen'] === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
+          <option value="3" ${profile.baseLevels?.['benen-billen'] === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
+          <option value="4" ${profile.baseLevels?.['benen-billen'] === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
+          <option value="5" ${profile.baseLevels?.['benen-billen'] === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
+          <option value="6" ${profile.baseLevels?.['benen-billen'] === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
+          <option value="7" ${profile.baseLevels?.['benen-billen'] === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
+          <option value="8" ${profile.baseLevels?.['benen-billen'] === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
+        </select>
+      </div>
+
+      <div class="settings__group">
+        <label class="settings__label">${t('set.lvl.back')}</label>
+        <select class="settings__input" id="set-level-rug">
+          <option value="0" ${profile.baseLevels?.['rug-houding'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
+          <option value="1" ${profile.baseLevels?.['rug-houding'] === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
+          <option value="2" ${profile.baseLevels?.['rug-houding'] === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
+          <option value="3" ${profile.baseLevels?.['rug-houding'] === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
+          <option value="4" ${profile.baseLevels?.['rug-houding'] === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
+          <option value="5" ${profile.baseLevels?.['rug-houding'] === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
+          <option value="6" ${profile.baseLevels?.['rug-houding'] === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
+          <option value="7" ${profile.baseLevels?.['rug-houding'] === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
+          <option value="8" ${profile.baseLevels?.['rug-houding'] === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
+        </select>
+      </div>
+
+
+      <div class="settings__group">
+        <label class="settings__label">${t('set.stretch')}</label>
+        <select class="settings__select" id="set-stretch">
+          <option value="true" ${profile.includeStretch !== false ? 'selected' : ''}>✅ ${lang === 'nl' ? 'Ja' : 'Yes'}</option>
+          <option value="false" ${profile.includeStretch === false ? 'selected' : ''}>❌ ${lang === 'nl' ? 'Nee' : 'No'}</option>
+        </select>
+      </div>
+
+      <div class="settings__row">
+        <div class="settings__group settings__group--half">
+          <label class="settings__label">${t('ob.time.minLabel')}</label>
+          <select class="settings__select" id="set-minutes">
+            <option value="10" ${profile.dailyMinutes === 10 ? 'selected' : ''}>10 min</option>
+            <option value="15" ${profile.dailyMinutes === 15 ? 'selected' : ''}>15 min</option>
+            <option value="20" ${profile.dailyMinutes === 20 ? 'selected' : ''}>20 min</option>
+          </select>
+        </div>
+        <div class="settings__group settings__group--half">
+          <label class="settings__label">${t('ob.time.daysLabel')}</label>
+          <select class="settings__select" id="set-days">
+            <option value="3" ${profile.daysPerWeek === 3 ? 'selected' : ''}>3 dgn</option>
+            <option value="4" ${profile.daysPerWeek === 4 ? 'selected' : ''}>4 dgn</option>
+            <option value="5" ${profile.daysPerWeek === 5 ? 'selected' : ''}>5 dgn</option>
+            <option value="6" ${profile.daysPerWeek === 6 ? 'selected' : ''}>6 dgn</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="settings__save-btn" id="settings-save">${t('btn.save')}</button>
+
+      <div class="settings__danger">
+        <button class="settings__reset-all-btn" id="settings-reset-all">${t('set.resetAll')}</button>
+      </div>
+
+      </div>
+      ${getBottomNavHTML('settings')}
+    `;
+
+  attachBottomNavListeners();
+
+  const langSelect = document.getElementById('set-language');
+  langSelect.addEventListener('change', () => {
+    profile.language = langSelect.value;
+    saveProfile(profile);
+    render();
+  });
+
+  const themeSelect = document.getElementById('set-theme');
+  themeSelect.addEventListener('change', () => {
+    profile.theme = themeSelect.value;
+    saveProfile(profile);
+    if (typeof applyTheme === 'function') applyTheme();
+  });
+
+  document.getElementById('settings-save').addEventListener('click', () => {
+    const dInput = document.getElementById('set-date');
+    let newDate = dInput.value;
+    const todayStr = formatDate(new Date());
+    if (newDate < todayStr) newDate = todayStr;
+
+
+    const updatedProfile = {
+      ...profile,
+      name: document.getElementById('set-name').value.trim() || 'Pilates Fan',
+      language: document.getElementById('set-language').value,
+      theme: document.getElementById('set-theme').value,
+      dailyMinutes: parseInt(document.getElementById('set-minutes').value),
+      daysPerWeek: parseInt(document.getElementById('set-days').value),
+      startDate: newDate,
+      baseLevels: {
+        'core': parseInt(document.getElementById('set-level-core').value),
+        'benen-billen': parseInt(document.getElementById('set-level-benen').value),
+        'rug-houding': parseInt(document.getElementById('set-level-rug').value)
+      },
+      includeStretch: document.getElementById('set-stretch').value === 'true',
+      onboardingComplete: true,
+    };
+    saveProfile(updatedProfile);
+    if (typeof applyTheme === 'function') applyTheme();
+    state.screen = 'home';
+    render();
+  });
+
+  document.getElementById('settings-reset-all').addEventListener('click', () => {
+    showDialog(
+      t('dlg.resetAll.title'),
+      t('dlg.resetAll.msg'),
+      t('btn.confirm'),
+      t('btn.cancel'),
+      () => {
+        resetAll();
+        state.screen = 'onboarding';
+        state.onboardingStep = 0;
+        state.onboardingData = { name: '', gender: 'female', dailyMinutes: 15, daysPerWeek: 6, startDate: '', baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } };
+        render();
+      }
+    );
+  });
+}
+
+`
 
 ## Bestand: src/ui/screens/workoutScreen.js
-```js
+`javascript
 import { state } from '../../state.js';
 import { app, render, showDialog, showToast, playBeep, escapeHTML } from '../core.js';
 import { getUserName, getProfile, markTodayComplete, getTotalCompleted, getMissedWorkouts } from '../../utils/storage.js';
@@ -6101,1162 +7252,62 @@ function handleQuit() {
   );
 }
 
-```
+`
 
-## Bestand: src/ui/screens/coachScreen.js
-```js
-import { app, showToast, showDialog, escapeHTML, registerScreenCleanup } from '../core.js';
-import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
-import { db } from '../../utils/firebase.js';
-import { getCurrentUser } from '../../utils/auth.js';
-import { getProfile, getTotalCompleted } from '../../utils/storage.js';
-import { collection, query, orderBy, onSnapshot, addDoc, getDocs, limit, serverTimestamp } from 'firebase/firestore';
-import { 
-  getAIProvider, 
-  setAIProvider, 
-  getSelectedLocalModelId, 
-  setSelectedLocalModelId, 
-  AVAILABLE_LOCAL_MODELS, 
-  checkWebGPUSupport, 
-  generateAIResponse,
-  analyzeVideoForm
-} from '../../utils/aiService.js';
+## Bestand: tests/storage.test.js
+`javascript
+import { describe, it, expect } from 'vitest';
+import { getWeekProgression, applyProgression, buildWorkoutSteps } from '../src/data/exercises.js';
 
-let unsubscribeChat = null;
-
-export function renderCoach() {
-  if (unsubscribeChat) {
-    unsubscribeChat();
-    unsubscribeChat = null;
-  }
-
-  const currentProvider = getAIProvider();
-  const currentModelId = getSelectedLocalModelId();
-
-  app.innerHTML = `
-    <div class="screen coach-screen">
-      <div class="screen__header">
-        <h1 class="screen__title">Kiné Coach</h1>
-        <p class="screen__subtitle">Your private concierge & feedback.</p>
-      </div>
-
-      <div class="screen__content">
-        <!-- Premium Video Form Check Card -->
-        <div class="coach__premium-card" id="coach-form-check-card">
-          <div class="coach__premium-icon">✨</div>
-          <div class="coach__premium-text">
-            <h2 class="coach__premium-title">Upload Video Form Check</h2>
-            <p class="coach__premium-desc">Upload een video of foto van je Pilates oefening voor gepersonaliseerde, anatomische feedback via Gemini Multimodal AI.</p>
-          </div>
-          <button class="btn btn--primary coach__upload-btn" id="coach-upload-video-btn">
-            🎥 Upload Video / Foto
-          </button>
-          <input type="file" id="form-check-file-input" accept="video/*,image/*" style="display: none;" />
-        </div>
-
-        <!-- AI Engine Bar -->
-        <div class="coach__engine-bar" id="coach-engine-bar">
-          <div class="coach__engine-info">
-            <span class="coach__engine-icon">${currentProvider === 'local' ? '📱' : '☁️'}</span>
-            <div class="coach__engine-details">
-              <span class="coach__engine-title">${currentProvider === 'local' ? 'Lokale LLM (On-Device)' : 'Google Gemini (Cloud)'}</span>
-              <span class="coach__engine-subtext" id="engine-subtext">
-                ${currentProvider === 'local' ? getModelName(currentModelId) : 'Vereist internet & API-sleutel'}
-              </span>
-            </div>
-          </div>
-          <button class="btn btn--secondary coach__engine-btn" id="coach-engine-settings-btn">
-            ⚙️ AI Kies
-          </button>
-        </div>
-
-        <!-- Download / Processing Progress Bar -->
-        <div class="coach__download-card" id="coach-download-card" style="display: none;">
-          <div class="coach__download-header">
-            <span class="coach__download-title" id="download-status-title">Model downloaden...</span>
-            <span class="coach__download-pct" id="download-status-pct">0%</span>
-          </div>
-          <div class="coach__progress-bar">
-            <div class="coach__progress-fill" id="download-progress-fill" style="width: 0%;"></div>
-          </div>
-          <p class="coach__download-detail" id="download-status-detail">Bestanden worden verwerkt...</p>
-        </div>
-
-        <div class="coach__chat" id="coach-chat-container">
-          <div class="coach__loading">Connecting to Kiné Coach...</div>
-        </div>
-      </div>
-
-      <div class="coach__input-area">
-        <button class="coach__media-btn" id="coach-media-btn" title="Upload Video voor Form Check" aria-label="Upload video of foto voor Form Check">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-        </button>
-        <input type="text" class="coach__input" id="coach-input" placeholder="Message your coach..." aria-label="Bericht voor Kiné Coach" />
-        <button class="coach__send-btn" id="coach-send" aria-label="Verstuur bericht">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-        </button>
-      </div>
-
-      <!-- Modal voor AI Selector -->
-      <div class="modal" id="ai-settings-modal" style="display: none;">
-        <div class="modal__content coach__modal-content">
-          <div class="modal__header">
-            <h3>AI Engine & Model Selectie</h3>
-            <button class="modal__close" id="ai-modal-close">&times;</button>
-          </div>
-          <div class="modal__body">
-            <p style="font-size: 0.9rem; color: var(--color-text-secondary); margin-bottom: 1rem;">
-              Kies hoe je AI Kiné Coach wil uitvoeren op je apparaat voor tekst-chat.
-            </p>
-
-            <div class="coach__option-group">
-              <label class="coach__radio-card ${currentProvider === 'cloud' ? 'coach__radio-card--selected' : ''}" id="option-cloud">
-                <input type="radio" name="ai_provider_radio" value="cloud" ${currentProvider === 'cloud' ? 'checked' : ''} />
-                <div class="coach__radio-content">
-                  <strong>☁️ Google Gemini Cloud (Aanbevolen)</strong>
-                  <p>Directe antwoorden & Vorm Check. Lichtgewicht (0 MB download).</p>
-                </div>
-              </label>
-
-              <label class="coach__radio-card ${currentProvider === 'local' ? 'coach__radio-card--selected' : ''}" id="option-local">
-                <input type="radio" name="ai_provider_radio" value="local" ${currentProvider === 'local' ? 'checked' : ''} />
-                <div class="coach__radio-content">
-                  <strong>📱 Lokale LLM (On-Device via WebGPU)</strong>
-                  <p>100% lokaal & privé. ⚠️ Vereist eenmalige download van 0.35 - 1.9 GB en WebGPU ondersteuning op je mobiel.</p>
-                </div>
-              </label>
-            </div>
-
-            <div class="coach__local-models-section" id="local-models-section" style="${currentProvider === 'local' ? 'display: block;' : 'display: none;'}">
-              <h4 style="margin-top: 1.2rem; margin-bottom: 0.5rem;">Kies Lokaal Model (Llama 3.2 / DeepSeek R1 / Gemma 2 / Qwen 2.5)</h4>
-              <div class="coach__model-list">
-                ${AVAILABLE_LOCAL_MODELS.map(m => `
-                  <div class="coach__model-card ${currentModelId === m.id ? 'coach__model-card--selected' : ''}" data-model-id="${m.id}">
-                    <div class="coach__model-main">
-                      <strong>${escapeHTML(m.name)}</strong>
-                      <div>
-                        ${m.badge ? `<span class="coach__model-badge">${escapeHTML(m.badge)}</span>` : ''}
-                        <span class="coach__model-tag">${escapeHTML(m.size)}</span>
-                      </div>
-                    </div>
-                    <p class="coach__model-desc">${escapeHTML(m.desc)}</p>
-                    <span class="coach__model-ram">RAM advies: ${escapeHTML(m.recommendedRAM)}</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-
-            <div class="modal__footer" style="margin-top: 1.5rem; text-align: right;">
-              <button class="btn btn--primary" id="ai-settings-save">Opslaan & Gebruiken</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    ${getBottomNavHTML('coach')}
-  `;
-
-  attachBottomNavListeners();
-
-  const user = getCurrentUser();
-  if (!user) {
-    document.getElementById('coach-chat-container').innerHTML = `
-      <div class="coach__message coach__message--received">
-        <div class="coach__avatar">F</div>
-        <div class="coach__bubble">Please log in to use the Kiné AI Coach.</div>
-      </div>`;
-    return;
-  }
-
-  // Setup Firebase Firestore chat stream
-  const chatRef = collection(db, 'users', user.uid, 'chats');
-  const q = query(chatRef, orderBy('createdAt', 'asc'));
-
-  unsubscribeChat = onSnapshot(q, (snapshot) => {
-    const container = document.getElementById('coach-chat-container');
-    if (!container) return;
-
-    if (snapshot.empty) {
-      container.innerHTML = `
-        <div class="coach__message coach__message--received">
-          <div class="coach__avatar">F</div>
-          <div class="coach__bubble">
-            Welcome to Kiné Premium. How can I assist you with your routine today?
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    let html = '';
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      const isUser = data.role === 'user';
-      html += `
-        <div class="coach__message ${isUser ? 'coach__message--sent' : 'coach__message--received'}">
-          ${!isUser ? '<div class="coach__avatar">F</div>' : ''}
-          <div class="coach__bubble">
-            ${escapeHTML(data.text || '').replace(/\n/g, '<br>')}
-          </div>
-        </div>
-      `;
-    });
-    container.innerHTML = html;
-
-    setTimeout(() => {
-      const chatContainer = document.getElementById('coach-chat-container');
-      if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
-    }, 50);
+describe('Exercise Progression & Workout Steps Logic', () => {
+  it('should scale week 1 correctly with gentle multiplier 1.0 at level 4 baseline', () => {
+    const prog = getWeekProgression(1, 4);
+    expect(prog.id).toBe('l4');
+    expect(prog.mult).toBe(1.0);
   });
 
-  // Event Listeners voor AI Selector Modal
-  const settingsBtn = document.getElementById('coach-engine-settings-btn');
-  const modal = document.getElementById('ai-settings-modal');
-  const modalClose = document.getElementById('ai-modal-close');
-  const modalSave = document.getElementById('ai-settings-save');
-
-  const optionCloud = document.getElementById('option-cloud');
-  const optionLocal = document.getElementById('option-local');
-  const localModelsSection = document.getElementById('local-models-section');
-
-  if (settingsBtn && modal) {
-    settingsBtn.addEventListener('click', () => { modal.style.display = 'flex'; });
-  }
-
-  if (modalClose && modal) {
-    modalClose.addEventListener('click', () => { modal.style.display = 'none'; });
-  }
-
-  const radios = document.querySelectorAll('input[name="ai_provider_radio"]');
-  radios.forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      const isLocal = e.target.value === 'local';
-      localModelsSection.style.display = isLocal ? 'block' : 'none';
-      optionCloud.classList.toggle('coach__radio-card--selected', !isLocal);
-      optionLocal.classList.toggle('coach__radio-card--selected', isLocal);
-    });
+  it('should scale week 8 correctly with gentle multiplier 1.25 at level 4 baseline', () => {
+    const prog = getWeekProgression(8, 4);
+    expect(prog.id).toBe('l4');
+    expect(prog.mult).toBe(1.25);
   });
 
-  let selectedModelInModal = currentModelId;
-  const modelCards = document.querySelectorAll('.coach__model-card');
-  modelCards.forEach(card => {
-    card.addEventListener('click', () => {
-      modelCards.forEach(c => c.classList.remove('coach__model-card--selected'));
-      card.classList.add('coach__model-card--selected');
-      selectedModelInModal = card.dataset.modelId;
-    });
+  it('should scale level 1 week 1 correctly (0.75 x 1.00 = 0.75)', () => {
+    const prog = getWeekProgression(1, 1);
+    expect(prog.id).toBe('l1');
+    expect(prog.mult).toBe(0.75);
   });
 
-  if (modalSave) {
-    modalSave.addEventListener('click', async () => {
-      const chosenProvider = document.querySelector('input[name="ai_provider_radio"]:checked').value;
-      setAIProvider(chosenProvider);
-      setSelectedLocalModelId(selectedModelInModal);
+  it('should cap hold duration at 30 seconds max', () => {
+    const mockExercise = {
+      id: 'test_hold',
+      type: 'combo',
+      baseReps: 10,
+      baseHoldDuration: 25,
+      sectionId: 'core'
+    };
 
-      if (chosenProvider === 'local') {
-        const gpuCheck = await checkWebGPUSupport();
-        if (!gpuCheck.supported) {
-          showToast(gpuCheck.reason, 'error');
-          setAIProvider('cloud');
-          renderCoach();
-          return;
-        }
-      }
-
-      modal.style.display = 'none';
-      showToast(`AI Engine ingesteld op: ${chosenProvider === 'local' ? 'Lokale LLM' : 'Google Gemini Cloud'}`);
-      renderCoach();
-    });
-  }
-
-  // Video Upload & Form Check Handler
-  const fileInput = document.getElementById('form-check-file-input');
-  const uploadBtn = document.getElementById('coach-upload-video-btn');
-  const mediaBtn = document.getElementById('coach-media-btn');
-
-  const triggerUpload = () => {
-    if (fileInput) fileInput.click();
-  };
-
-  if (uploadBtn) uploadBtn.addEventListener('click', triggerUpload);
-  if (mediaBtn) mediaBtn.addEventListener('click', triggerUpload);
-
-  if (fileInput) {
-    fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      fileInput.value = '';
-
-      showDialog(
-        '🔒 Privacy & AI Form Check',
-        'Vier stilstaande beelden uit je bestand worden verwerkt door Google Gemini AI voor anatomische feedback. Zorg dat er geen gevoelige beelden van derden zichtbaar zijn. Wil je doorgaan met de analyse?',
-        'Ja, verwerk beelden',
-        'Annuleren',
-        async () => {
-          const isVideo = file.type.startsWith('video/');
-          const fileLabel = isVideo ? '🎥 [Videobestand geüpload voor Vorm-check]' : '📷 [Afbeelding geüpload voor Vorm-check]';
-
-          try {
-            await addDoc(chatRef, {
-              role: 'user',
-              text: fileLabel,
-              createdAt: serverTimestamp()
-            });
-
-        const downloadCard = document.getElementById('coach-download-card');
-        const downloadTitle = document.getElementById('download-status-title');
-        const downloadPct = document.getElementById('download-status-pct');
-        const downloadFill = document.getElementById('download-progress-fill');
-        const downloadDetail = document.getElementById('download-status-detail');
-
-        if (downloadCard) {
-          downloadCard.style.display = 'block';
-          downloadTitle.innerText = 'Video / Foto analyseren...';
-          downloadPct.innerText = '10%';
-          downloadFill.style.width = '10%';
-          downloadDetail.innerText = 'Sleutelframes worden verwerkt...';
-        }
-
-        const chatContainer = document.getElementById('coach-chat-container');
-        if (chatContainer) {
-          const typingDiv = document.createElement('div');
-          typingDiv.className = 'coach__typing';
-          typingDiv.id = 'coach-typing-indicator';
-          typingDiv.innerText = 'Kiné Gemini Multimodal is de houding aan het analyseren...';
-          chatContainer.appendChild(typingDiv);
-          chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        const feedback = await analyzeVideoForm({
-          file: file,
-          exerciseName: 'Pilates Routine',
-          onProgress: (text, pct) => {
-            if (downloadCard) {
-              downloadTitle.innerText = 'Kiné Form Check verwerken...';
-              downloadPct.innerText = `${pct}%`;
-              downloadFill.style.width = `${pct}%`;
-              downloadDetail.innerText = text;
-            }
-          }
-        });
-
-        if (downloadCard) downloadCard.style.display = 'none';
-        const indicator = document.getElementById('coach-typing-indicator');
-        if (indicator) indicator.remove();
-
-        const reportText = `✨ Kiné Anatomische Form Check Rapport:\n\n${feedback}`;
-        await addDoc(chatRef, {
-          role: 'model',
-          text: reportText,
-          createdAt: serverTimestamp()
-        });
-
-        showToast('Form Check analyse voltooid!', 'success');
-
-      } catch (err) {
-        console.error(err);
-        const downloadCard = document.getElementById('coach-download-card');
-        if (downloadCard) downloadCard.style.display = 'none';
-
-        const indicator = document.getElementById('coach-typing-indicator');
-        if (indicator) indicator.remove();
-
-        await addDoc(chatRef, {
-          role: 'model',
-          text: `Fout bij Vorm-Check analyse: ${err.message}`,
-          createdAt: serverTimestamp()
-        });
-        showToast(`Video-analyse mislukt: ${err.message}`, 'error');
-      }
-    });
-  });
-}
-
-  // Send Message Logic
-  const sendBtn = document.getElementById('coach-send');
-  const input = document.getElementById('coach-input');
-
-  registerScreenCleanup('coach', () => {
-    if (unsubscribeChat) {
-      unsubscribeChat();
-      unsubscribeChat = null;
-    }
+    const scaled = applyProgression(mockExercise, 8, 1);
+    expect(scaled.holdDuration).toBeLessThanOrEqual(30);
   });
 
-  const sendMessage = async () => {
-    const text = input.value.trim();
-    if (!text) return;
-
-    input.value = '';
-
-    try {
-      // Fetch previous chat history BEFORE adding current prompt to avoid prompt duplication in context
-      const qContext = query(chatRef, orderBy('createdAt', 'desc'), limit(6));
-      const contextSnap = await getDocs(qContext);
-      const history = [];
-      contextSnap.forEach(doc => {
-        const d = doc.data();
-        history.unshift({
-          role: d.role === 'user' ? 'user' : 'model',
-          parts: [{ text: d.text }]
-        });
-      });
-
-      await addDoc(chatRef, {
-        role: 'user',
-        text: text,
-        createdAt: serverTimestamp()
-      });
-
-      const chatContainer = document.getElementById('coach-chat-container');
-      if (chatContainer) {
-        const typingDiv = document.createElement('div');
-        typingDiv.className = 'coach__typing';
-        typingDiv.id = 'coach-typing-indicator';
-        typingDiv.innerText = getAIProvider() === 'local' ? 'Lokale AI denkt na...' : 'Kiné Coach is typing...';
-        chatContainer.appendChild(typingDiv);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-      }
-
-      const profile = getProfile();
-      const completed = getTotalCompleted();
-      const userContext = `De gebruiker heet ${profile.name || 'deze sporter'} en heeft als doel ${profile.goals ? profile.goals.join(' en ') : 'fit worden'}. Ze hebben tot nu toe ${completed} workouts voltooid.`;
-      const systemInstruction = `Je bent Kiné Coach, een high-end AI fitness en Pilates coach in een exclusieve app. Geef korte, professionele en aanmoedigende antwoorden in het Nederlands. Maximaal 2-3 zinnen. Context: ${userContext}`;
-
-      const downloadCard = document.getElementById('coach-download-card');
-      const downloadTitle = document.getElementById('download-status-title');
-      const downloadPct = document.getElementById('download-status-pct');
-      const downloadFill = document.getElementById('download-progress-fill');
-      const downloadDetail = document.getElementById('download-status-detail');
-
-      const replyText = await generateAIResponse({
-        prompt: text,
-        history: history,
-        systemInstruction: systemInstruction,
-        onProgress: (progressText, pct) => {
-          if (downloadCard) {
-            downloadCard.style.display = 'block';
-            downloadTitle.innerText = 'Lokale LLM Laden / Downloaden...';
-            downloadPct.innerText = `${pct}%`;
-            downloadFill.style.width = `${pct}%`;
-            downloadDetail.innerText = progressText;
-          }
-        }
-      });
-
-      if (downloadCard) downloadCard.style.display = 'none';
-      const indicator = document.getElementById('coach-typing-indicator');
-      if (indicator) indicator.remove();
-
-      await addDoc(chatRef, {
-        role: 'model',
-        text: replyText,
-        createdAt: serverTimestamp()
-      });
-
-    } catch (e) {
-      const downloadCard = document.getElementById('coach-download-card');
-      if (downloadCard) downloadCard.style.display = 'none';
-
-      const indicator = document.getElementById('coach-typing-indicator');
-      if (indicator) indicator.remove();
-
-      console.error(e);
-      await addDoc(chatRef, {
-        role: 'model',
-        text: `Fout (${getAIProvider() === 'local' ? 'Lokaal Model' : 'Gemini Cloud'}): ${e.message}`,
-        createdAt: serverTimestamp()
-      });
-    }
-  };
-
-  if (sendBtn) sendBtn.addEventListener('click', sendMessage);
-  if (input) input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
-  });
-}
-
-function getModelName(id) {
-  const found = AVAILABLE_LOCAL_MODELS.find(m => m.id === id);
-  return found ? found.name : id;
-}
-
-```
-
-## Bestand: src/ui/screens/communityScreen.js
-```js
-import { state } from '../../state.js';
-import { app, render, showPrompt, showDialog, showToast, escapeHTML } from '../core.js';
-import { loginWithGoogle, loginWithEmail, registerWithEmail, logout } from '../../utils/auth.js';
-import { getLeaderboard, createCommunity, getUserCommunities, pushUserProgress } from '../../utils/social.js';
-import { getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from '../../utils/storage.js';
-import { t } from '../../utils/i18n.js';
-import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
-
-export function renderCommunityWrapper() {
-  if (state.authLoading) {
-    app.innerHTML = `<div class="screen community"><div class="community__loading">${t('comm.loading')}</div></div>`;
-    return;
-  }
-
-  if (!state.currentUser) {
-    renderLoginScreen();
-  } else {
-    renderCommunity();
-  }
-}
-
-function renderLoginScreen() {
-  const inviteCode = localStorage.getItem('pilates_pending_invite');
-  app.innerHTML = `
-    <div class="screen auth-screen">
-      <div class="settings__header">
-        <button class="settings__back-btn" id="auth-back">${t('btn.back')}</button>
-      </div>
-      <div class="auth__container">
-        <div class="auth__icon">🏆</div>
-        <h2 class="auth__title">${t('auth.title')}</h2>
-        <p class="auth__subtitle">
-          ${inviteCode ? t('auth.sub2', escapeHTML(inviteCode)) : t('auth.sub1')}
-        </p>
-        
-        <button class="auth__btn auth__btn--google" id="login-google">
-          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 15.02 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-          ${t('auth.google')}
-        </button>
-
-        <div class="auth__divider">${t('auth.or')}</div>
-
-        <form class="auth__form" id="email-form">
-          <input type="email" class="settings__input" id="auth-email" placeholder="${t('auth.email')}" required />
-          <input type="password" class="settings__input" id="auth-password" placeholder="${t('auth.pass')}" required minlength="6" />
-          <div class="auth__buttons">
-            <button type="submit" class="auth__btn auth__btn--email">${t('auth.loginBtn')}</button>
-            <button type="button" class="auth__btn auth__btn--secondary" id="register-btn">${t('auth.regBtn')}</button>
-          </div>
-          <p class="auth__error" id="auth-error"></p>
-        </form>
-      </div>
-    </div>
-  `;
-
-  document.getElementById('auth-back').addEventListener('click', () => { state.screen = 'home'; render(); });
-  
-  document.getElementById('login-google').addEventListener('click', async () => {
-    const res = await loginWithGoogle();
-    if (res.error) document.getElementById('auth-error').textContent = res.error;
+  it('should build workout steps for selected sections without gender restriction', () => {
+    const steps = buildWorkoutSteps(['benen-billen', 'core'], 1, { core: 1, 'benen-billen': 1 });
+    expect(steps.length).toBeGreaterThan(0);
   });
 
-  document.getElementById('email-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('auth-email').value;
-    const pass = document.getElementById('auth-password').value;
-    const res = await loginWithEmail(email, pass);
-    if (res.error) document.getElementById('auth-error').textContent = res.error;
-  });
-
-  document.getElementById('register-btn').addEventListener('click', async () => {
-    const email = document.getElementById('auth-email').value;
-    const pass = document.getElementById('auth-password').value;
-    if (!email || !pass) return document.getElementById('auth-error').textContent = t('auth.fieldsRequired');
-    const res = await registerWithEmail(email, pass);
-    if (res.error) document.getElementById('auth-error').textContent = res.error;
-  });
-}
-
-export async function loadCommunitiesAndLeaderboard() {
-  state.loadingLeaderboard = true;
-  render();
-
-  // Fallback: always push latest progress before fetching leaderboard
-  // This ensures data is synced even if the post-workout push failed
-  const profile = getProfile();
-  if (profile) {
-    await pushUserProgress({
-      name: profile.name,
-      totalWorkouts: getTotalCompleted(),
-      missedWorkouts: getMissedWorkouts(),
-      currentWeek: getCurrentWeek()
-    });
-  }
-
-  state.myCommunities = await getUserCommunities();
-  state.leaderboard = await getLeaderboard(state.activeCommunity);
-  state.loadingLeaderboard = false;
-  render();
-}
-
-function renderCommunity() {
-  app.innerHTML = `
-    <div class="screen community">
-      <div class="settings__header">
-        <h2 class="settings__title">${t('comm.title')}</h2>
-        <button class="settings__back-btn" id="logout-btn" style="color:var(--rose-dark)">${t('comm.logout')}</button>
-      </div>
-
-      <div class="community__tabs">
-        ${state.myCommunities.map(c => `
-          <button class="community__tab ${state.activeCommunity === c.id ? 'community__tab--active' : ''}" data-cid="${c.id}">
-            ${escapeHTML(c.name)}
-          </button>
-        `).join('')}
-      </div>
-      
-      <div class="community__actions">
-        ${state.activeCommunity !== 'global' ? `
-          <button class="community__action-btn" id="invite-btn">${t('comm.inviteCopy')}</button>
-        ` : ''}
-        <button class="community__action-btn" id="create-group-btn">${t('comm.newGroup')}</button>
-      </div>
-
-      <div class="community__leaderboard">
-        ${state.loadingLeaderboard ? `<div class="community__loading">${t('comm.loading')}</div>` : `
-          ${state.leaderboard.length === 0 ? `<div class="community__empty">${t('comm.empty')}</div>` : `
-            ${state.leaderboard.map((user, index) => {
-              const rankColor = index===0 ? 'var(--gold)' : index===1 ? 'var(--silver)' : index===2 ? 'var(--bronze)' : 'var(--sage)';
-              return `
-              <div class="community__user">
-                <div class="community__rank" style="color: ${rankColor}">${index + 1}</div>
-                <div class="community__user-info">
-                  <div class="community__user-name">${escapeHTML(user.name)} ${user.id === state.currentUser.uid ? t('comm.you') : ''}</div>
-                  <div class="community__user-meta">${t('comm.week')} ${user.currentWeek} · ${t('comm.lastActive')} ${user.lastActive}</div>
-                  ${user.missedWorkouts > 0 ? `<div class="community__user-meta" style="color: var(--rose-dark);">😴 ${user.missedWorkouts} ${t('comm.missed')}</div>` : ''}
-                </div>
-                <div class="community__user-score">
-                  <span class="community__score-value">${user.totalWorkouts}</span>
-                  <span class="community__score-label">${t('home.workouts')}</span>
-                </div>
-              </div>
-              `;
-            }).join('')}
-          `}
-        `}
-      </div>
-      
-      </div>
-      ${getBottomNavHTML('community')}
-    `;
-
-  attachBottomNavListeners();
-  document.getElementById('logout-btn').addEventListener('click', async () => { await logout(); });
-
-  document.querySelectorAll('.community__tab').forEach(tab => {
-    tab.addEventListener('click', async () => {
-      state.activeCommunity = tab.dataset.cid;
-      await loadCommunitiesAndLeaderboard();
-    });
-  });
-
-  const inviteBtn = document.getElementById('invite-btn');
-  if (inviteBtn) {
-    inviteBtn.addEventListener('click', () => {
-      const baseUrl = import.meta.env.VITE_APP_URL || 'https://pilates-22dcd.web.app';
-      const link = `${baseUrl}/?invite=${state.activeCommunity}`;
-      navigator.clipboard.writeText(link);
-      inviteBtn.textContent = t('comm.inviteCopied');
-      setTimeout(() => inviteBtn.textContent = t('comm.inviteCopy'), 2000);
-    });
-  }
-
-  document.getElementById('create-group-btn').addEventListener('click', () => {
-    showPrompt(
-      t('comm.newGroup'),
-      t('comm.createPrompt'),
-      t('btn.confirm'),
-      t('btn.cancel'),
-      (name) => {
-        if (name && name.trim()) {
-          createCommunity(name.trim()).then(async (code) => {
-            state.activeCommunity = code;
-            await loadCommunitiesAndLeaderboard();
-            showDialog(t('comm.createSuccess.title'), t('comm.createSuccess.msg'), t('btn.confirm'), null, () => {});
-          }).catch(err => showToast(err.message || t('comm.createError'), 'error'));
-        }
-      }
-    );
-  });
-}
-
-```
-
-## Bestand: src/ui/screens/completeScreen.js
-```js
-import { state } from '../../state.js';
-import { app, render } from '../core.js';
-import { getUserName, getTotalCompleted, getCurrentWeek } from '../../utils/storage.js';
-import { loadCommunitiesAndLeaderboard } from './communityScreen.js';
-import { t } from '../../utils/i18n.js';
-
-export function renderComplete() {
-  const name = getUserName();
-  const n = name ? name : '';
-  const totalCompleted = getTotalCompleted();
-  const currentWeek = getCurrentWeek();
-
-
-  const messages = [
-    t('comp.msg1', n),
-    t('comp.msg2', n),
-    t('comp.msg3', n),
-  ];
-  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-
-  app.innerHTML = `
-    <div class="screen complete" id="complete-screen">
-      <div class="complete__celebration">🎉</div>
-      <h2 class="complete__title">${t('comp.title')}</h2>
-      <p class="complete__message">${randomMessage}</p>
-
-      <div class="complete__stats">
-        <div class="complete__stat">
-          <div class="complete__stat-value">${totalCompleted}</div>
-          <div class="complete__stat-label">${t('comp.workoutsTotal')}</div>
-        </div>
-        <div class="complete__stat">
-          <div class="complete__stat-value">${t('comm.week')} ${currentWeek}</div>
-          <div class="complete__stat-label">${t('comp.currentWeek')}</div>
-        </div>
-      </div>
-
-      <button class="complete__home-btn" id="home-btn">${t('comp.btn.home')}</button>
-      <button class="complete__community-btn" id="goto-community-btn">${t('comp.btn.leaderboard')}</button>
-    </div>
-  `;
-
-  document.getElementById('home-btn').addEventListener('click', () => {
-    state.justFinishedWorkout = true;
-    state.screen = 'home';
-    render();
-  });
-  document.getElementById('goto-community-btn').addEventListener('click', () => {
-    state.screen = 'community';
-    render();
-    if (state.currentUser) {
-      loadCommunitiesAndLeaderboard();
-    }
-  });
-}
-
-```
-
-## Bestand: src/ui/screens/onboardingScreen.js
-```js
-import { state } from '../../state.js';
-import { app, render, escapeHTML } from '../core.js';
-import { saveProfile, formatDate } from '../../utils/storage.js';
-import { t, getLanguage } from '../../utils/i18n.js';
-
-export function renderOnboarding() {
-  const step = state.onboardingStep || 0;
-  const data = state.onboardingData || { name: '', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: formatDate(new Date()), baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } };
-  state.onboardingData = data;
-
-  const steps = [
-    renderStep0, // name
-    renderStep2, // level
-    renderStep3, // time & days
-    renderStep4, // start date
-  ];
-
-  app.innerHTML = `
-    <div class="screen onboarding" id="onboarding-screen">
-      <div class="onboarding__progress">
-        <div class="onboarding__progress-bar" style="width: ${((step + 1) / steps.length) * 100}%"></div>
-      </div>
-      <div class="onboarding__step-indicator">${t('ob.step.of', step + 1, steps.length)}</div>
-      
-      ${steps[step]()}
-
-      <div class="onboarding__nav">
-        ${step > 0 ? `<button class="onboarding__btn onboarding__btn--secondary" id="ob-prev">${t('btn.back')}</button>` : '<div></div>'}
-        <button class="onboarding__btn" id="ob-next" ${!canProceed(step, data) ? 'disabled' : ''}>
-          ${step === steps.length - 1 ? t('ob.btn.start') : t('btn.next')}
-        </button>
-      </div>
-    </div>
-  `;
-
-  attachOnboardingListeners(step, steps.length);
-}
-
-function renderStep0() {
-  return `
-    <h2 class="onboarding__title">${t('ob.welcome.title')}</h2>
-    <p class="onboarding__subtitle">${t('ob.welcome.sub')}</p>
-    <div class="onboarding__group">
-      <label class="onboarding__label">${t('ob.name.label')}</label>
-      <input type="text" class="onboarding__input" id="ob-name" placeholder="${t('ob.name.placeholder')}" value="${escapeHTML(state.onboardingData.name)}" autofocus>
-    </div>
-  `;
-}
-
-function renderStep2() {
-  const data = state.onboardingData;
-  return `
-    <h2 class="onboarding__title">${t('ob.level.title')}</h2>
-    <p class="onboarding__subtitle">${t('ob.level.sub')}</p>
+  it('should split per-side exercises into Links and Rechts steps', () => {
+    const steps = buildWorkoutSteps(['benen-billen', 'core'], 1, { core: 1, 'benen-billen': 1 });
+    const sideSteps = steps.filter(s => s.perSide);
     
-    <div class="onboarding__group">
-      <label class="onboarding__label">${t('set.lvl.core')}</label>
-      <select class="settings__input" id="ob-level-core">
-        <option value="0" ${data.baseLevels.core === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
-        <option value="1" ${data.baseLevels.core === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
-        <option value="4" ${data.baseLevels.core === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
-        <option value="6" ${data.baseLevels.core === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
-      </select>
-    </div>
-
-    <div class="onboarding__group">
-      <label class="onboarding__label">${t('set.lvl.legs')}</label>
-      <select class="settings__input" id="ob-level-benen">
-        <option value="0" ${data.baseLevels['benen-billen'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
-        <option value="1" ${data.baseLevels['benen-billen'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
-        <option value="4" ${data.baseLevels['benen-billen'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
-        <option value="6" ${data.baseLevels['benen-billen'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
-      </select>
-    </div>
-
-    <div class="onboarding__group">
-      <label class="onboarding__label">${t('set.lvl.back')}</label>
-      <select class="settings__input" id="ob-level-rug">
-        <option value="0" ${data.baseLevels['rug-houding'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
-        <option value="1" ${data.baseLevels['rug-houding'] === 1 ? 'selected' : ''}>${t('ob.level.beg.title')} - ${t('ob.level.beg.desc')}</option>
-        <option value="4" ${data.baseLevels['rug-houding'] === 4 ? 'selected' : ''}>${t('ob.level.int.title')} - ${t('ob.level.int.desc')}</option>
-        <option value="6" ${data.baseLevels['rug-houding'] === 6 ? 'selected' : ''}>${t('ob.level.adv.title')} - ${t('ob.level.adv.desc')}</option>
-      </select>
-    </div>
-  `;
-}
-
-function renderStep3() {
-  const min = state.onboardingData.dailyMinutes;
-  const days = state.onboardingData.daysPerWeek;
-  const stretch = state.onboardingData.includeStretch !== false;
-  const lang = getLanguage();
-  
-  return `
-    <h2 class="onboarding__title">${t('ob.time.title')}</h2>
-    <p class="onboarding__subtitle">${t('ob.time.sub')}</p>
-    <div class="onboarding__group">
-      <label class="onboarding__label">${t('ob.time.minLabel')}</label>
-      <div class="onboarding__options" id="ob-min-options">
-        ${renderOption('min', 10, '⏱', '10 min', min === 10)}
-        ${renderOption('min', 15, '⏱', '15 min', min === 15)}
-        ${renderOption('min', 20, '⏱', '20 min', min === 20)}
-      </div>
-    </div>
-    <div class="onboarding__group">
-      <label class="onboarding__label">${t('ob.time.daysLabel')}</label>
-      <div class="onboarding__options" id="ob-days-options">
-        ${renderOption('days', 3, '📅', '3 dgn', days === 3)}
-        ${renderOption('days', 4, '📅', '4 dgn', days === 4)}
-        ${renderOption('days', 5, '📅', '5 dgn', days === 5)}
-        ${renderOption('days', 6, '📅', '6 dgn', days === 6)}
-      </div>
-    </div>
-    <div class="onboarding__group">
-      <label class="onboarding__label">${t('set.stretch')}</label>
-      <div class="onboarding__options" id="ob-stretch-options">
-        ${renderOption('stretch', 'true', '✅', lang === 'nl' ? 'Ja' : 'Yes', stretch === true)}
-        ${renderOption('stretch', 'false', '❌', lang === 'nl' ? 'Nee' : 'No', stretch === false)}
-      </div>
-    </div>
-  `;
-}
-
-function renderStep4() {
-  const minDate = formatDate(new Date());
-  return `
-    <h2 class="onboarding__title">${t('ob.start.title')}</h2>
-    <p class="onboarding__subtitle">${t('ob.start.sub')}</p>
-    <div class="onboarding__group">
-      <input type="date" class="onboarding__input" id="ob-start-date" value="${state.onboardingData.startDate || minDate}" min="${minDate}" />
-    </div>
-  `;
-}
-
-function renderOption(type, value, emoji, label, isSelected) {
-  return `
-    <button class="onboarding__option ${isSelected ? 'onboarding__option--selected' : ''}" data-${type}="${value}">
-      <span class="onboarding__option-emoji">${emoji}</span>
-      <span class="onboarding__option-label">${label}</span>
-    </button>
-  `;
-}
-
-function canProceed(step, data) {
-  if (step === 0 && !data.name.trim()) return false;
-  return true;
-}
-
-function attachOnboardingListeners(step, totalSteps = 4) {
-  const prevBtn = document.getElementById('ob-prev');
-  const nextBtn = document.getElementById('ob-next');
-
-  if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
-      saveStepData(step);
-      state.onboardingStep--;
-      render();
-    });
-  }
-
-  if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-      saveStepData(step);
-      if (step === totalSteps - 1) {
-        completeOnboarding();
-      } else {
-        state.onboardingStep++;
-        render();
-      }
-    });
-  }
-
-  if (step === 0) {
-    const input = document.getElementById('ob-name');
-    input.addEventListener('input', () => {
-      state.onboardingData.name = input.value;
-      nextBtn.disabled = !canProceed(0, state.onboardingData);
-    });
-  } else if (step === 2) {
-    document.querySelectorAll('#ob-min-options .onboarding__option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.onboardingData.dailyMinutes = parseInt(btn.dataset.min);
-        render();
-      });
-    });
-    document.querySelectorAll('#ob-days-options .onboarding__option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.onboardingData.daysPerWeek = parseInt(btn.dataset.days);
-        render();
-      });
-    });
-    document.querySelectorAll('#ob-stretch-options .onboarding__option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.onboardingData.includeStretch = btn.dataset.stretch === 'true';
-        render();
-      });
-    });
-  }
-}
-
-function saveStepData(step) {
-  if (step === 0) {
-    state.onboardingData.name = document.getElementById('ob-name').value.trim();
-  } else if (step === 2) {
-    state.onboardingData.baseLevels = {
-      core: parseInt(document.getElementById('ob-level-core').value),
-      'benen-billen': parseInt(document.getElementById('ob-level-benen').value),
-      'rug-houding': parseInt(document.getElementById('ob-level-rug').value),
-    };
-  } else if (step === 4) {
-    state.onboardingData.startDate = document.getElementById('ob-start-date').value;
-  }
-}
-
-function completeOnboarding() {
-  const finalProfile = { ...state.onboardingData, onboardingComplete: true };
-  saveProfile(finalProfile);
-  state.screen = 'home';
-  render();
-}
-
-```
-
-## Bestand: src/ui/screens/settingsScreen.js
-```js
-import { state } from '../../state.js';
-import { app, render, showDialog, escapeHTML } from '../core.js';
-import { getProfile, saveProfile, resetAll, formatDate } from '../../utils/storage.js';
-import { t, getLanguage } from '../../utils/i18n.js';
-import { applyTheme } from '../../main.js';
-import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
-
-export function renderSettings() {
-  const profile = getProfile() || {};
-  const lang = getLanguage();
-  const theme = profile.theme || 'auto';
-
-  app.innerHTML = `
-    <div class="screen settings">
-      <div class="settings__header">
-        <h2 class="settings__title">${t('set.title')}</h2>
-      </div>
-
-      <div class="settings__group">
-        <label class="settings__label">${t('set.name')}</label>
-        <input class="settings__input" type="text" id="set-name" value="${escapeHTML(profile.name || '')}" />
-      </div>
-
-      <div class="settings__row">
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('set.language')}</label>
-          <select class="settings__select" id="set-language">
-            <option value="nl" ${lang === 'nl' ? 'selected' : ''}>🇳🇱 Nederlands</option>
-            <option value="en" ${lang === 'en' ? 'selected' : ''}>🇬🇧 English</option>
-          </select>
-        </div>
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('set.theme')}</label>
-          <select class="settings__select" id="set-theme">
-            <option value="auto" ${theme === 'auto' ? 'selected' : ''}>🌓 ${t('set.theme.auto')}</option>
-            <option value="light" ${theme === 'light' ? 'selected' : ''}>☀️ ${t('set.theme.light')}</option>
-            <option value="dark" ${theme === 'dark' ? 'selected' : ''}>🌙 ${t('set.theme.dark')}</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="settings__group">
-        <label class="settings__label">${t('set.startDate')}</label>
-        <input type="date" class="settings__input" id="set-date" value="${profile.startDate || formatDate(new Date())}" />
-      </div>
-
-      <div class="settings__group">
-        <label class="settings__label">${t('set.lvl.core')}</label>
-        <select class="settings__input" id="set-level-core">
-          <option value="0" ${profile.baseLevels?.core === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
-          <option value="1" ${profile.baseLevels?.core === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
-          <option value="2" ${profile.baseLevels?.core === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
-          <option value="3" ${profile.baseLevels?.core === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
-          <option value="4" ${profile.baseLevels?.core === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
-          <option value="5" ${profile.baseLevels?.core === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
-          <option value="6" ${profile.baseLevels?.core === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
-          <option value="7" ${profile.baseLevels?.core === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
-          <option value="8" ${profile.baseLevels?.core === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
-        </select>
-      </div>
-
-      <div class="settings__group">
-        <label class="settings__label">${t('set.lvl.legs')}</label>
-        <select class="settings__input" id="set-level-benen">
-          <option value="0" ${profile.baseLevels?.['benen-billen'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
-          <option value="1" ${profile.baseLevels?.['benen-billen'] === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
-          <option value="2" ${profile.baseLevels?.['benen-billen'] === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
-          <option value="3" ${profile.baseLevels?.['benen-billen'] === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
-          <option value="4" ${profile.baseLevels?.['benen-billen'] === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
-          <option value="5" ${profile.baseLevels?.['benen-billen'] === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
-          <option value="6" ${profile.baseLevels?.['benen-billen'] === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
-          <option value="7" ${profile.baseLevels?.['benen-billen'] === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
-          <option value="8" ${profile.baseLevels?.['benen-billen'] === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
-        </select>
-      </div>
-
-      <div class="settings__group">
-        <label class="settings__label">${t('set.lvl.back')}</label>
-        <select class="settings__input" id="set-level-rug">
-          <option value="0" ${profile.baseLevels?.['rug-houding'] === 0 ? 'selected' : ''}>${t('set.lvl.0')}</option>
-          <option value="1" ${profile.baseLevels?.['rug-houding'] === 1 ? 'selected' : ''}>${t('set.lvl.1')}</option>
-          <option value="2" ${profile.baseLevels?.['rug-houding'] === 2 ? 'selected' : ''}>${t('set.lvl.2')}</option>
-          <option value="3" ${profile.baseLevels?.['rug-houding'] === 3 ? 'selected' : ''}>${t('set.lvl.3')}</option>
-          <option value="4" ${profile.baseLevels?.['rug-houding'] === 4 ? 'selected' : ''}>${t('set.lvl.4')}</option>
-          <option value="5" ${profile.baseLevels?.['rug-houding'] === 5 ? 'selected' : ''}>${t('set.lvl.5')}</option>
-          <option value="6" ${profile.baseLevels?.['rug-houding'] === 6 ? 'selected' : ''}>${t('set.lvl.6')}</option>
-          <option value="7" ${profile.baseLevels?.['rug-houding'] === 7 ? 'selected' : ''}>${t('set.lvl.7')}</option>
-          <option value="8" ${profile.baseLevels?.['rug-houding'] === 8 ? 'selected' : ''}>${t('set.lvl.8')}</option>
-        </select>
-      </div>
-
-
-      <div class="settings__group">
-        <label class="settings__label">${t('set.stretch')}</label>
-        <select class="settings__select" id="set-stretch">
-          <option value="true" ${profile.includeStretch !== false ? 'selected' : ''}>✅ ${lang === 'nl' ? 'Ja' : 'Yes'}</option>
-          <option value="false" ${profile.includeStretch === false ? 'selected' : ''}>❌ ${lang === 'nl' ? 'Nee' : 'No'}</option>
-        </select>
-      </div>
-
-      <div class="settings__row">
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('ob.time.minLabel')}</label>
-          <select class="settings__select" id="set-minutes">
-            <option value="10" ${profile.dailyMinutes === 10 ? 'selected' : ''}>10 min</option>
-            <option value="15" ${profile.dailyMinutes === 15 ? 'selected' : ''}>15 min</option>
-            <option value="20" ${profile.dailyMinutes === 20 ? 'selected' : ''}>20 min</option>
-          </select>
-        </div>
-        <div class="settings__group settings__group--half">
-          <label class="settings__label">${t('ob.time.daysLabel')}</label>
-          <select class="settings__select" id="set-days">
-            <option value="3" ${profile.daysPerWeek === 3 ? 'selected' : ''}>3 dgn</option>
-            <option value="4" ${profile.daysPerWeek === 4 ? 'selected' : ''}>4 dgn</option>
-            <option value="5" ${profile.daysPerWeek === 5 ? 'selected' : ''}>5 dgn</option>
-            <option value="6" ${profile.daysPerWeek === 6 ? 'selected' : ''}>6 dgn</option>
-          </select>
-        </div>
-      </div>
-
-      <button class="settings__save-btn" id="settings-save">${t('btn.save')}</button>
-
-      <div class="settings__danger">
-        <button class="settings__reset-all-btn" id="settings-reset-all">${t('set.resetAll')}</button>
-      </div>
-
-      </div>
-      ${getBottomNavHTML('settings')}
-    `;
-
-  attachBottomNavListeners();
-
-  const langSelect = document.getElementById('set-language');
-  langSelect.addEventListener('change', () => {
-    profile.language = langSelect.value;
-    saveProfile(profile);
-    render();
+    if (sideSteps.length > 0) {
+      expect(sideSteps[0].sideName).toBe('Links');
+      expect(sideSteps[1].sideName).toBe('Rechts');
+      expect(sideSteps[0].sideIndex).toBe(0);
+      expect(sideSteps[1].sideIndex).toBe(1);
+    }
   });
+});
 
-  const themeSelect = document.getElementById('set-theme');
-  themeSelect.addEventListener('change', () => {
-    profile.theme = themeSelect.value;
-    saveProfile(profile);
-    if (typeof applyTheme === 'function') applyTheme();
-  });
-
-  document.getElementById('settings-save').addEventListener('click', () => {
-    const dInput = document.getElementById('set-date');
-    let newDate = dInput.value;
-    const todayStr = formatDate(new Date());
-    if (newDate < todayStr) newDate = todayStr;
-
-
-    const updatedProfile = {
-      ...profile,
-      name: document.getElementById('set-name').value.trim() || 'Pilates Fan',
-      language: document.getElementById('set-language').value,
-      theme: document.getElementById('set-theme').value,
-      dailyMinutes: parseInt(document.getElementById('set-minutes').value),
-      daysPerWeek: parseInt(document.getElementById('set-days').value),
-      startDate: newDate,
-      baseLevels: {
-        'core': parseInt(document.getElementById('set-level-core').value),
-        'benen-billen': parseInt(document.getElementById('set-level-benen').value),
-        'rug-houding': parseInt(document.getElementById('set-level-rug').value)
-      },
-      includeStretch: document.getElementById('set-stretch').value === 'true',
-      onboardingComplete: true,
-    };
-    saveProfile(updatedProfile);
-    if (typeof applyTheme === 'function') applyTheme();
-    state.screen = 'home';
-    render();
-  });
-
-  document.getElementById('settings-reset-all').addEventListener('click', () => {
-    showDialog(
-      t('dlg.resetAll.title'),
-      t('dlg.resetAll.msg'),
-      t('btn.confirm'),
-      t('btn.cancel'),
-      () => {
-        resetAll();
-        state.screen = 'onboarding';
-        state.onboardingStep = 0;
-        state.onboardingData = { name: '', gender: 'female', dailyMinutes: 15, daysPerWeek: 6, startDate: '', baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } };
-        render();
-      }
-    );
-  });
-}
-
-```
+`
 
