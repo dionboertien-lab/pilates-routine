@@ -1,9 +1,10 @@
 # Pilates Routine — Volledige Broncode voor Review
 
-Dit document bevat de complete broncode van de Pilates Routine web-app.
+Dit document bevat de complete, ongewijzigde broncode van de Pilates Routine web-app.
 
 ## Bestand: package.json
-`json
+
+```json
 {
   "name": "pilates-routine",
   "private": true,
@@ -38,10 +39,11 @@ Dit document bevat de complete broncode van de Pilates Routine web-app.
   }
 }
 
-`
+```
 
 ## Bestand: firestore.rules
-`text
+
+```text
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -90,10 +92,11 @@ service cloud.firestore {
   }
 }
 
-`
+```
 
 ## Bestand: index.html
-`html
+
+```html
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -119,10 +122,248 @@ service cloud.firestore {
 </body>
 </html>
 
-`
+```
+
+## Bestand: eslint.config.js
+
+```javascript
+export default [
+  {
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        localStorage: 'readonly',
+        navigator: 'readonly',
+        fetch: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        URL: 'readonly',
+        FileReader: 'readonly',
+        HTMLVideoElement: 'readonly',
+        HTMLCanvasElement: 'readonly',
+        URLSearchParams: 'readonly',
+        File: 'readonly'
+      }
+    },
+    rules: {
+      'no-unused-vars': 'warn',
+      'no-undef': 'error'
+    }
+  }
+];
+
+```
+
+## Bestand: capacitor.config.ts
+
+```typescript
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.dionboertien.pilates',
+  appName: 'Kiné',
+  webDir: 'dist',
+  plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
+  },
+};
+
+export default config;
+
+```
+
+## Bestand: src/main.js
+
+```javascript
+import './style.css';
+import { state } from './state.js';
+import { render } from './ui/core.js';
+import { isOnboardingComplete, getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from './utils/storage.js';
+import { subscribeToAuth } from './utils/auth.js';
+import { getLeaderboard, getUserCommunities, initializeSocialUser, joinCommunity } from './utils/social.js';
+import { StatusBar, Style } from '@capacitor/status-bar';
+
+// Setup auth listener
+subscribeToAuth(async (user) => {
+  state.currentUser = user;
+  state.authLoading = false;
+  if (user) {
+    const profile = getProfile() || {};
+    await initializeSocialUser(profile, getTotalCompleted(), getCurrentWeek(), getMissedWorkouts());
+    
+    const pendingInvite = localStorage.getItem('pilates_pending_invite');
+    if (pendingInvite) {
+      try {
+        await joinCommunity(pendingInvite);
+        localStorage.removeItem('pilates_pending_invite');
+        state.activeCommunity = pendingInvite;
+        const { showToast } = await import('./ui/core.js');
+        showToast(`Lid geworden van groep ${pendingInvite}!`, 'success');
+      } catch (e) {
+        console.warn('Could not join community from invite:', e);
+      }
+    }
+
+    if (state.screen === 'community') {
+      state.loadingLeaderboard = true;
+      render();
+      state.myCommunities = await getUserCommunities();
+      state.leaderboard = await getLeaderboard(state.activeCommunity);
+      state.loadingLeaderboard = false;
+      render();
+    }
+  } else if (state.screen === 'community') {
+    render();
+  }
+});
+
+// Parse invite code from URL on boot
+const urlParams = new URLSearchParams(window.location.search);
+const inviteCode = urlParams.get('invite');
+if (inviteCode) {
+  localStorage.setItem('pilates_pending_invite', inviteCode);
+  // Optional: clear URL
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+// Initial boot
+
+export async function applyTheme() {
+  const profile = getProfile();
+  let theme = profile ? profile.theme : 'auto';
+
+  if (!theme || theme === 'auto') {
+    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    try {
+      await StatusBar.setStyle({ style: Style.Dark });
+      await StatusBar.setBackgroundColor({ color: '#1A1C19' });
+    } catch (e) {
+      console.warn('StatusBar not available', e);
+    }
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    try {
+      await StatusBar.setStyle({ style: Style.Light });
+      await StatusBar.setBackgroundColor({ color: '#F7F2EA' });
+    } catch (e) {
+      console.warn('StatusBar not available', e);
+    }
+  }
+}
+
+// Watch for system theme changes if set to auto
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  const profile = getProfile();
+  if (!profile || !profile.theme || profile.theme === 'auto') {
+    applyTheme();
+  }
+});
+
+applyTheme();
+
+if (isOnboardingComplete()) {
+  state.screen = 'home';
+} else {
+  state.screen = 'onboarding';
+  state.onboardingStep = 0;
+}
+render();
+
+// Service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+import { App as CapacitorApp } from '@capacitor/app';
+import { disconnectHeartRateMonitor } from './utils/bluetooth.js';
+
+CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+  if (state.screen === 'home') {
+    CapacitorApp.exitApp();
+  } else if (state.screen === 'onboarding') {
+    if (state.onboardingStep > 0) {
+      state.onboardingStep--;
+      render();
+    } else {
+      CapacitorApp.exitApp();
+    }
+  } else {
+    if (state.timerInterval) {
+      clearInterval(state.timerInterval);
+      state.timerInterval = null;
+    }
+    if (state.trackerInterval) {
+      clearInterval(state.trackerInterval);
+      state.trackerInterval = null;
+    }
+    if (state.bluetoothDeviceId) {
+      disconnectHeartRateMonitor(state.bluetoothDeviceId);
+      state.bluetoothDeviceId = null;
+    }
+    state.screen = 'home';
+    render();
+  }
+});
+
+```
+
+## Bestand: src/state.js
+
+```javascript
+export const state = {
+  screen: 'home', 
+  onboardingStep: 0,
+  onboardingData: { name: '', gender: 'female', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: '' },
+  workoutSteps: [],
+  currentStepIndex: 0,
+  showingSectionIntro: false,
+  currentSectionId: null,
+  todayFocus: null,
+  timerInterval: null,
+  timerRunning: false,
+  timerRemaining: 0,
+  timerTotal: 0,
+  repsRemaining: 0,
+  repsTotal: 0,
+  comboPhase: 'reps',
+  exerciseComplete: false,
+  skippedCount: 0,
+  skippedCoreCount: 0,
+  liveBpm: null,
+  liveKcal: null,
+  bluetoothDeviceId: null,
+  trackerInterval: null,
+  justFinishedWorkout: false,
+  // Social/Auth State
+  currentUser: null,
+  authLoading: true,
+  leaderboard: [],
+  loadingLeaderboard: false,
+  myCommunities: [],
+  activeCommunity: 'global',
+};
+
+```
 
 ## Bestand: src/style.css
-`css
+
+```css
 /* ═══════════════════════════════════════════════════════════
    PILATES ROUTINE — Design System & Styles
    Inspired by the original exercise sheet's warm, feminine aesthetic
@@ -2607,187 +2848,11 @@ html {
 
 
 
-`
-
-## Bestand: src/main.js
-`javascript
-import './style.css';
-import { state } from './state.js';
-import { render } from './ui/core.js';
-import { isOnboardingComplete, getProfile, getTotalCompleted, getCurrentWeek, getMissedWorkouts } from './utils/storage.js';
-import { subscribeToAuth } from './utils/auth.js';
-import { getLeaderboard, getUserCommunities, initializeSocialUser, joinCommunity } from './utils/social.js';
-import { StatusBar, Style } from '@capacitor/status-bar';
-
-// Setup auth listener
-subscribeToAuth(async (user) => {
-  state.currentUser = user;
-  state.authLoading = false;
-  if (user) {
-    const profile = getProfile() || {};
-    await initializeSocialUser(profile, getTotalCompleted(), getCurrentWeek(), getMissedWorkouts());
-    
-    const pendingInvite = localStorage.getItem('pilates_pending_invite');
-    if (pendingInvite) {
-      try {
-        await joinCommunity(pendingInvite);
-        localStorage.removeItem('pilates_pending_invite');
-        state.activeCommunity = pendingInvite;
-        const { showToast } = await import('./ui/core.js');
-        showToast(`Lid geworden van groep ${pendingInvite}!`, 'success');
-      } catch (e) {
-        console.warn('Could not join community from invite:', e);
-      }
-    }
-
-    if (state.screen === 'community') {
-      state.loadingLeaderboard = true;
-      render();
-      state.myCommunities = await getUserCommunities();
-      state.leaderboard = await getLeaderboard(state.activeCommunity);
-      state.loadingLeaderboard = false;
-      render();
-    }
-  } else if (state.screen === 'community') {
-    render();
-  }
-});
-
-// Parse invite code from URL on boot
-const urlParams = new URLSearchParams(window.location.search);
-const inviteCode = urlParams.get('invite');
-if (inviteCode) {
-  localStorage.setItem('pilates_pending_invite', inviteCode);
-  // Optional: clear URL
-  window.history.replaceState({}, document.title, window.location.pathname);
-}
-
-// Initial boot
-
-export async function applyTheme() {
-  const profile = getProfile();
-  let theme = profile ? profile.theme : 'auto';
-
-  if (!theme || theme === 'auto') {
-    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
-  if (theme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    try {
-      await StatusBar.setStyle({ style: Style.Dark });
-      await StatusBar.setBackgroundColor({ color: '#1A1C19' });
-    } catch (e) {
-      console.warn('StatusBar not available', e);
-    }
-  } else {
-    document.documentElement.removeAttribute('data-theme');
-    try {
-      await StatusBar.setStyle({ style: Style.Light });
-      await StatusBar.setBackgroundColor({ color: '#F7F2EA' });
-    } catch (e) {
-      console.warn('StatusBar not available', e);
-    }
-  }
-}
-
-// Watch for system theme changes if set to auto
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  const profile = getProfile();
-  if (!profile || !profile.theme || profile.theme === 'auto') {
-    applyTheme();
-  }
-});
-
-applyTheme();
-
-if (isOnboardingComplete()) {
-  state.screen = 'home';
-} else {
-  state.screen = 'onboarding';
-  state.onboardingStep = 0;
-}
-render();
-
-// Service worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
-
-import { App as CapacitorApp } from '@capacitor/app';
-import { disconnectHeartRateMonitor } from './utils/bluetooth.js';
-
-CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-  if (state.screen === 'home') {
-    CapacitorApp.exitApp();
-  } else if (state.screen === 'onboarding') {
-    if (state.onboardingStep > 0) {
-      state.onboardingStep--;
-      render();
-    } else {
-      CapacitorApp.exitApp();
-    }
-  } else {
-    if (state.timerInterval) {
-      clearInterval(state.timerInterval);
-      state.timerInterval = null;
-    }
-    if (state.trackerInterval) {
-      clearInterval(state.trackerInterval);
-      state.trackerInterval = null;
-    }
-    if (state.bluetoothDeviceId) {
-      disconnectHeartRateMonitor(state.bluetoothDeviceId);
-      state.bluetoothDeviceId = null;
-    }
-    state.screen = 'home';
-    render();
-  }
-});
-
-`
-
-## Bestand: src/state.js
-`javascript
-export const state = {
-  screen: 'home', 
-  onboardingStep: 0,
-  onboardingData: { name: '', gender: 'female', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: '' },
-  workoutSteps: [],
-  currentStepIndex: 0,
-  showingSectionIntro: false,
-  currentSectionId: null,
-  todayFocus: null,
-  timerInterval: null,
-  timerRunning: false,
-  timerRemaining: 0,
-  timerTotal: 0,
-  repsRemaining: 0,
-  repsTotal: 0,
-  comboPhase: 'reps',
-  exerciseComplete: false,
-  skippedCount: 0,
-  skippedCoreCount: 0,
-  liveBpm: null,
-  liveKcal: null,
-  bluetoothDeviceId: null,
-  trackerInterval: null,
-  justFinishedWorkout: false,
-  // Social/Auth State
-  currentUser: null,
-  authLoading: true,
-  leaderboard: [],
-  loadingLeaderboard: false,
-  myCommunities: [],
-  activeCommunity: 'global',
-};
-
-`
+```
 
 ## Bestand: src/data/exercises.js
-`javascript
+
+```javascript
 /**
  * Complete exercise data for the Pilates Routine.
  *
@@ -3256,1810 +3321,11 @@ export function buildWorkoutSteps(sectionIds, currentWeek, baseLevels = {}) {
 
 // End of file
 
-`
-
-## Bestand: src/utils/aiService.js
-`javascript
-import { CreateMLCEngine } from '@mlc-ai/web-llm';
-
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL; // Optional backend proxy endpoint
-
-export const AVAILABLE_LOCAL_MODELS = [
-  {
-    id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
-    name: 'Meta Llama 3.2 (1B)',
-    size: '~880 MB',
-    badge: 'Nieuw & Aanbevolen',
-    desc: 'Meta\'s nieuwste lightweight on-device model. Zeer slim en efficiënt.',
-    recommendedRAM: '2GB+'
-  },
-  {
-    id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',
-    name: 'Meta Llama 3.2 (3B)',
-    size: '~1.9 GB',
-    badge: 'High Quality',
-    desc: 'Bovenklasse redeneervermogen van Meta op het apparaat.',
-    recommendedRAM: '4GB+'
-  },
-  {
-    id: 'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
-    name: 'DeepSeek R1 Distill (1.5B)',
-    size: '~1.1 GB',
-    badge: 'Reasoning AI',
-    desc: 'Het populaire DeepSeek R1 redeneermodel, geoptimaliseerd voor mobiel.',
-    recommendedRAM: '2.5GB+'
-  },
-  {
-    id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
-    name: 'Qwen 2.5 (1.5B)',
-    size: '~1.2 GB',
-    badge: 'Top Meertalig',
-    desc: 'Uitstekend in Nederlands en nauwkeurig opvolgen van instructies.',
-    recommendedRAM: '2.5GB+'
-  },
-  {
-    id: 'gemma-2-2b-it-q4f16_1-MLC',
-    name: 'Google Gemma 2 (2B)',
-    size: '~1.5 GB',
-    badge: 'Google AI',
-    desc: 'Google\'s 2e generatie Gemma model voor on-device taken.',
-    recommendedRAM: '3GB+'
-  },
-  {
-    id: 'SmolLM-360M-Instruct-q4f16_1-MLC',
-    name: 'SmolLM (360M)',
-    size: '~350 MB',
-    badge: 'Ultra-Licht',
-    desc: 'Super compact. Werkt soepel op vrijwel elk mobiel toestel.',
-    recommendedRAM: '1GB+'
-  }
-];
-
-
-const STORAGE_KEYS = {
-  PROVIDER: 'ai_provider', // 'cloud' | 'local'
-  MODEL_ID: 'ai_local_model' // Selected local model ID
-};
-
-let mlcEngine = null;
-let currentEngineModelId = null;
-let initializationPromise = null;
-
-export function getAIProvider() {
-  return localStorage.getItem(STORAGE_KEYS.PROVIDER) || 'cloud';
-}
-
-export function setAIProvider(provider) {
-  if (provider !== 'cloud' && provider !== 'local') return;
-  localStorage.setItem(STORAGE_KEYS.PROVIDER, provider);
-}
-
-export function getSelectedLocalModelId() {
-  return localStorage.getItem(STORAGE_KEYS.MODEL_ID) || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
-}
-
-export function setSelectedLocalModelId(modelId) {
-  localStorage.setItem(STORAGE_KEYS.MODEL_ID, modelId);
-}
-
-export async function checkWebGPUSupport() {
-  if (!navigator.gpu) {
-    return {
-      supported: false,
-      reason: 'WebGPU is niet ondersteund in deze browser of WebView. Gebruik Google Gemini (Cloud).'
-    };
-  }
-
-  try {
-    const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) {
-      return {
-        supported: false,
-        reason: 'Geen geschikte WebGPU grafische adapter gevonden op dit apparaat.'
-      };
-    }
-    return { supported: true, reason: 'WebGPU is beschikbaar' };
-  } catch (e) {
-    return {
-      supported: false,
-      reason: `WebGPU controle mislukt: ${e.message}`
-    };
-  }
-}
-
-export async function initLocalEngine(modelId = null, onProgress = null) {
-  const selectedModel = modelId || getSelectedLocalModelId();
-  if (mlcEngine && currentEngineModelId === selectedModel) {
-    return mlcEngine;
-  }
-
-  if (initializationPromise) {
-    return initializationPromise;
-  }
-
-  initializationPromise = (async () => {
-    const gpuCheck = await checkWebGPUSupport();
-    if (!gpuCheck.supported) {
-      throw new Error(gpuCheck.reason);
-    }
-    const engine = await CreateMLCEngine(selectedModel, {
-      initProgressCallback: (progress) => {
-        if (onProgress) {
-          const text = progress.text || 'Laden...';
-          const pct = Math.round((progress.progress || 0) * 100);
-          onProgress(text, pct);
-        }
-      }
-    });
-    mlcEngine = engine;
-    currentEngineModelId = selectedModel;
-    return engine;
-  })();
-
-  try {
-    return await initializationPromise;
-  } catch (err) {
-    mlcEngine = null;
-    currentEngineModelId = null;
-    throw new Error(`Fout bij laden van lokaal model (${selectedModel}): ${err.message}`);
-  } finally {
-    initializationPromise = null;
-  }
-}
-
-export function isEngineLoaded() {
-  return mlcEngine !== null;
-}
-
-export async function generateAIResponse({ prompt, history = [], systemInstruction = '', onProgress = null }) {
-  const provider = getAIProvider();
-
-  if (provider === 'local') {
-    const engine = await initLocalEngine(null, onProgress);
-
-    const formattedMessages = [];
-    if (systemInstruction) {
-      formattedMessages.push({ role: 'system', content: systemInstruction });
-    }
-
-    history.forEach((msg) => {
-      const role = msg.role === 'model' ? 'assistant' : msg.role;
-      const text = msg.parts ? msg.parts.map(p => p.text).join('\n') : (msg.text || '');
-      if (text) {
-        formattedMessages.push({ role: role, content: text });
-      }
-    });
-
-    formattedMessages.push({ role: 'user', content: prompt });
-
-    const completion = await engine.chat.completions.create({
-      messages: formattedMessages,
-      temperature: 0.7,
-      max_tokens: 256
-    });
-
-    return completion.choices[0]?.message?.content || 'Geen antwoord gegenereerd.';
-  } else {
-    // Cloud API via Google Gemini REST API
-    if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
-      throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie.');
-    }
-
-    const contentsHistory = [];
-    history.forEach(msg => {
-      const role = msg.role === 'user' ? 'user' : 'model';
-      const text = msg.parts ? msg.parts[0]?.text : (msg.text || '');
-      contentsHistory.push({ role, parts: [{ text }] });
-    });
-    contentsHistory.push({ role: 'user', parts: [{ text: prompt }] });
-
-    // Sanitize strictly alternating roles
-    const historyClean = [];
-    let lastRole = null;
-    for (const msg of contentsHistory) {
-      if (msg.role !== lastRole) {
-        historyClean.push(msg);
-        lastRole = msg.role;
-      } else {
-        historyClean[historyClean.length - 1].parts[0].text += '\n' + msg.parts[0].text;
-      }
-    }
-
-    const targetEndpoint = AI_PROXY_URL 
-      ? AI_PROXY_URL 
-      : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
-
-    const response = await fetch(targetEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: historyClean,
-        systemInstruction: systemInstruction ? { role: 'system', parts: [{ text: systemInstruction }] } : undefined,
-        generationConfig: { temperature: 0.7 }
-      })
-    });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error?.message || 'Fout bij aanroepen van Gemini API');
-    }
-
-    const responseData = await response.json();
-    return responseData.candidates?.[0]?.content?.parts?.[0]?.text || 'Geen antwoord ontvangen van Gemini Cloud.';
-  }
-}
-
-function seekVideo(video, time, timeoutMs = 8000) {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error('Video-seek duurde te lang.'));
-    }, timeoutMs);
-
-    function cleanup() {
-      clearTimeout(timeout);
-      video.removeEventListener('seeked', handleSeeked);
-      video.removeEventListener('error', handleError);
-    }
-
-    function handleSeeked() {
-      cleanup();
-      resolve();
-    }
-
-    function handleError() {
-      cleanup();
-      reject(new Error('Video-frame kon niet geladen worden.'));
-    }
-
-    video.addEventListener('seeked', handleSeeked, { once: true });
-    video.addEventListener('error', handleError, { once: true });
-    video.currentTime = time;
-  });
-}
-
-export async function extractVideoKeyframes(videoFile, numFrames = 4) {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    const objectUrl = URL.createObjectURL(videoFile);
-    video.preload = 'metadata';
-    video.src = objectUrl;
-    video.muted = true;
-    video.playsInline = true;
-
-    video.onloadedmetadata = async () => {
-      try {
-        const duration = Number(video.duration);
-        if (!Number.isFinite(duration) || duration <= 0) {
-          throw new Error('De videoduur kon niet worden bepaald.');
-        }
-
-        const width = video.videoWidth;
-        const height = video.videoHeight;
-        if (!width || !height) {
-          throw new Error('De video heeft geen geldige afmetingen.');
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.min(width, 800);
-        canvas.height = Math.round((canvas.width / width) * height);
-        const ctx = canvas.getContext('2d');
-
-        const frames = [];
-        const interval = duration / (numFrames + 1);
-
-        for (let i = 1; i <= numFrames; i++) {
-          const time = interval * i;
-          await seekVideo(video, time, 8000);
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          frames.push(dataUrl.split(',')[1]);
-        }
-
-        resolve(frames);
-      } catch (err) {
-        reject(err);
-      } finally {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-
-    video.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Fout bij het laden van het videobestand in de browser.'));
-    };
-  });
-}
-
-export async function extractImagePayload(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      const separatorIndex = result.indexOf(',');
-      if (separatorIndex < 0) {
-        reject(new Error('Ongeldige afbeeldingsdata.'));
-        return;
-      }
-      resolve({
-        mimeType: file.type || 'image/jpeg',
-        data: result.slice(separatorIndex + 1)
-      });
-    };
-    reader.onerror = err => reject(err);
-    reader.readAsDataURL(file);
-  });
-}
-
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-export const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
-
-export function validateFormCheckFile(file) {
-  if (!(file instanceof File)) {
-    throw new Error('Geen geldig bestand geselecteerd.');
-  }
-
-  const isImage = file.type.startsWith('image/');
-  const isVideo = file.type.startsWith('video/');
-
-  if (!isImage && !isVideo) {
-    throw new Error('Selecteer een afbeelding of een videobestand.');
-  }
-
-  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-  if (file.size > maxBytes) {
-    const maxMb = Math.round(maxBytes / (1024 * 1024));
-    throw new Error(`Het bestand mag maximaal ${maxMb} MB zijn.`);
-  }
-
-  return { isImage, isVideo };
-}
-
-export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening', onProgress = null }) {
-  if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
-    throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie voor video-analyse.');
-  }
-
-  const { isImage, isVideo } = validateFormCheckFile(file);
-  let inlineParts = [];
-
-  if (isVideo) {
-    if (onProgress) onProgress('Video keyframes verwerken...', 30);
-    const frames = await extractVideoKeyframes(file, 4);
-    inlineParts = frames.map(f => ({
-      inlineData: { mimeType: 'image/jpeg', data: f }
-    }));
-  } else if (isImage) {
-    if (onProgress) onProgress('Afbeelding verwerken...', 50);
-    const imgPayload = await extractImagePayload(file);
-    inlineParts = [{
-      inlineData: imgPayload
-    }];
-  }
-
-  if (onProgress) onProgress('Anatomische analyse uitvoeren via Kiné Gemini Multimodal Cloud...', 70);
-
-  const FORM_CHECK_SYSTEM_INSTRUCTION = `Je geeft uitsluitend algemene, educatieve bewegings- en houdingsfeedback.
-Belangrijke beperkingen:
-- Stel geen medische diagnose.
-- Beoordeel geen blessures, pijnklachten of medische aandoeningen.
-- Doe geen uitspraken alsof stilstaande beelden volledige zekerheid bieden.
-- Benoem onzekerheid wanneer camerahoek of kleding de beoordeling beperkt.
-- Adviseer te stoppen bij pijn of duizeligheid en verwijs bij klachten naar een bevoegde arts of fysiotherapeut.
-- Gebruik neutrale termen zoals "mogelijk zichtbaar" en "op basis van deze beelden".`;
-
-  const promptText = `${FORM_CHECK_SYSTEM_INSTRUCTION}
-
-Analyseer de geüploade beelden van de oefening ("${exerciseName}"). Geef een heldere en educatieve beoordeling in het Nederlands met de volgende opbouw:
-
-🧘 **Mogelijk Zichtbare Uitlijning**: Wat valt op aan de positie op basis van deze beelden?
-⚠️ **Aandachtspunten**: Waar zit mogelijke compensatie (bijv. bekken, schouders, wervelkolom)?
-💡 **3 Bewegingstips**: Geef 3 algemene tips om de controle te verbeteren.`;
-
-  const targetEndpoint = AI_PROXY_URL 
-    ? AI_PROXY_URL 
-    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
-
-  const response = await fetch(targetEndpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: promptText },
-          ...inlineParts
-        ]
-      }],
-      generationConfig: { temperature: 0.4 }
-    })
-  });
-
-  if (onProgress) onProgress('Rapport genereren...', 95);
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error?.message || 'Fout bij verzenden van beelden naar Gemini Multimodal API.');
-  }
-
-  const responseData = await response.json();
-  const feedbackText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!feedbackText) {
-    throw new Error('Geen analyse-uitslag ontvangen van de Multimodale AI.');
-  }
-
-  return feedbackText;
-}
-
-
-`
-
-## Bestand: src/utils/auth.js
-`javascript
-import { auth } from './firebase.js';
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithCredential,
-  signOut, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-
-const googleProvider = new GoogleAuthProvider();
-
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-
-// Detect if running inside Capacitor (native app)
-function isNativeApp() {
-  return window.Capacitor?.isNative === true;
-}
-
-// Initialize GoogleAuth only on web platform (native platforms use configuration files and crash on initialize)
-if (!isNativeApp()) {
-  GoogleAuth.initialize({
-    clientId: '443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com',
-    scopes: ['profile', 'email'],
-    grantOfflineAccess: true,
-  });
-}
-
-export function subscribeToAuth(callback) {
-  // Check for redirect result on app load (for native flow, if we ever fallback)
-  getRedirectResult(auth).catch(() => {});
-  return onAuthStateChanged(auth, callback);
-}
-
-export function getCurrentUser() {
-  return auth.currentUser;
-}
-
-export async function loginWithGoogle() {
-  try {
-    if (isNativeApp()) {
-      // In native app, use the Capacitor Google Auth plugin
-      const googleUser = await GoogleAuth.signIn();
-      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-      const result = await signInWithCredential(auth, credential);
-      return { user: result.user, error: null };
-    } else {
-      // On web, use popup
-      const result = await signInWithPopup(auth, googleProvider);
-      return { user: result.user, error: null };
-    }
-  } catch (error) {
-    return { user: null, error: error.message };
-  }
-}
-
-export async function loginWithEmail(email, password) {
-  try {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return { user: result.user, error: null };
-  } catch (error) {
-    return { user: null, error: error.message };
-  }
-}
-
-export async function registerWithEmail(email, password) {
-  try {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    return { user: result.user, error: null };
-  } catch (error) {
-    return { user: null, error: error.message };
-  }
-}
-
-export async function logout() {
-  await signOut(auth);
-}
-
-
-`
-
-## Bestand: src/utils/bluetooth.js
-`javascript
-import { BleClient } from '@capacitor-community/bluetooth-le';
-
-const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
-const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
-
-export function isPlausibleHeartRate(value) {
-  return Number.isInteger(value) && value >= 30 && value <= 240;
-}
-
-/**
- * Connects to a Bluetooth Low Energy Heart Rate Monitor.
- * Requests the user to select a device broadcasting the Heart Rate Service.
- * @param {Function} onHeartRateUpdate Callback fired when a new BPM is received.
- * @param {Function} onDisconnect Callback fired when the device disconnects.
- * @returns {Promise<string>} The device ID of the connected monitor.
- */
-export async function connectHeartRateMonitor(onHeartRateUpdate, onDisconnect) {
-  try {
-    // Initialize the BLE client (requests necessary permissions on Android/iOS)
-    await BleClient.initialize();
-
-    // Request device that broadcasts the HR service
-    const device = await BleClient.requestDevice({
-      services: [HEART_RATE_SERVICE],
-    });
-
-    // Connect to the device
-    await BleClient.connect(device.deviceId, (disconnectedDeviceId) => {
-      console.log(`Smartwatch disconnected: ${disconnectedDeviceId}`);
-      if (onDisconnect) onDisconnect();
-    });
-
-    // Start receiving notifications
-    await BleClient.startNotifications(
-      device.deviceId,
-      HEART_RATE_SERVICE,
-      HEART_RATE_MEASUREMENT,
-      (value) => {
-        // Parse the characteristic value according to GATT specifications
-        // Value is a DataView. The first byte contains flags.
-        const flags = value.getUint8(0);
-        // If the 0th bit is 0, heart rate format is 8-bit (UINT8)
-        // If 1, format is 16-bit (UINT16)
-        const is16BitFormat = flags & 0x01;
-        
-        let heartRate;
-        if (is16BitFormat) {
-          heartRate = value.getUint16(1, true); // true for little-endian
-        } else {
-          heartRate = value.getUint8(1);
-        }
-        
-        if (isPlausibleHeartRate(heartRate)) {
-          onHeartRateUpdate(heartRate);
-        } else {
-          console.warn('Ignoring implausible BPM:', heartRate);
-        }
-      }
-    );
-    
-    return device.deviceId;
-  } catch (error) {
-    console.error("Bluetooth connection failed:", error);
-    throw error;
-  }
-}
-
-/**
- * Disconnects from the connected Heart Rate Monitor.
- * @param {string} deviceId The device ID to disconnect from.
- */
-export async function disconnectHeartRateMonitor(deviceId) {
-  if (!deviceId) return;
-  try {
-    await BleClient.disconnect(deviceId);
-    console.log(`Disconnected from ${deviceId}`);
-  } catch (error) {
-    console.error("Failed to disconnect:", error);
-  }
-}
-
-`
-
-## Bestand: src/utils/firebase.js
-`javascript
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Cloud Firestore and get a reference to the service
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-
-`
-
-## Bestand: src/utils/i18n.js
-`javascript
-import { getProfile } from './storage.js';
-
-export const translations = {
-  nl: {
-    // Shared
-    'btn.back': '← Terug',
-    'btn.save': 'Opslaan',
-    'btn.cancel': 'Annuleren',
-    'btn.confirm': 'Bevestigen',
-    'btn.next': 'Volgende →',
-    'btn.quit': '✕ Stop',
-    'btn.skip': 'Overslaan',
-    'btn.start': '▶ Start',
-    'btn.pause': '⏸ Pauze',
-    'btn.finish': 'Afronden ✓',
-    'nav.home': 'Home',
-    'nav.coach': 'Coach',
-    'nav.community': 'Community',
-    'nav.settings': 'Instellingen',
-    
-    // Home
-    'home.greeting': 'Hoi',
-    'home.minPerDay': 'min per dag',
-    'home.daysPerWeek': 'dagen per week',
-    'home.avgLevel': 'Gem. Niveau',
-    'home.today': 'Vandaag',
-    'home.doneToday': 'Vandaag al voltooid — goed bezig! 💚',
-    'home.playAgain': '✓ Nogmaals oefenen',
-    'home.workouts': 'Workouts',
-    'home.weeks': 'Weken',
-    'home.intensity': 'Intensiteit',
-    'home.scienceBadge': 'Opbouw van de routine',
-    'home.quote': '♥ Jouw consistentie vandaag, is je resultaat morgen. ♥',
-    
-    // Calendar
-    'calendar.title': '📅 Schema',
-    'calendar.reset': 'Voortgang resetten',
-    'calendar.days': ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'],
-
-    // Onboarding
-    'ob.step.of': 'Stap {0} van {1}',
-    'ob.welcome.title': 'Welkom!',
-    'ob.welcome.sub': 'Laten we je Pilates routine instellen.',
-    'ob.name.label': 'Hoe mogen we je noemen?',
-    'ob.name.placeholder': 'Je naam...',
-    'ob.gender.title': 'Wat is je geslacht?',
-    'ob.gender.sub': 'Hier stemmen we de oefeningen op af.',
-    'ob.gender.f': 'Vrouw',
-    'ob.gender.m': 'Man',
-    'ob.gender.n': 'Liever niet zeggen',
-    'ob.goals.title': 'Waar wil je aan werken',
-    'ob.goals.sub': 'Kies één of meer focusgebieden.',
-    'ob.goals.legs': 'Billen & Benen',
-    'ob.goals.core': 'Core, Buik & Armen',
-    'ob.goals.back': 'Rug & Houding',
-    'ob.goals.all': 'Alles',
-    'ob.level.title': 'Wat is je startniveau?',
-    'ob.level.sub': 'We bouwen de intensiteit vanaf hier langzaam op.',
-    'ob.level.beg.title': 'Beginner (Makkelijk)',
-    'ob.level.beg.desc': 'Start rustig aan.',
-    'ob.level.int.title': 'Gemiddeld',
-    'ob.level.int.desc': 'Je hebt al wat ervaring.',
-    'ob.level.adv.title': 'Gevorderd',
-    'ob.level.adv.desc': 'Klaar voor een uitdaging!',
-    'ob.time.title': 'Tijd & frequentie',
-    'ob.time.sub': 'Hoeveel tijd per dag en hoe vaak per week?',
-    'ob.time.minLabel': 'Minuten per dag',
-    'ob.time.daysLabel': 'Dagen per week',
-    'ob.start.title': 'Wanneer begin je?',
-    'ob.start.sub': 'Het schema start op deze datum.',
-    'ob.btn.start': 'Starten! 🎉',
-
-    // Settings
-    'set.title': 'Instellingen',
-    'set.name': 'Naam',
-    'set.startDate': 'Startdatum Schema',
-    'set.lvl.core': 'Niveau Core, Buik & Armen',
-    'set.lvl.legs': 'Niveau Billen & Benen',
-    'set.lvl.back': 'Niveau Rug & Houding',
-    'set.gender': 'Geslacht',
-    'set.goals': 'Focusgebieden',
-    'set.stretch': 'Inclusief stretch',
-    'set.resetAll': 'Alles resetten & opnieuw beginnen',
-    'set.language': 'Taal',
-    'set.theme': 'Thema',
-    'set.theme.light': 'Licht',
-    'set.theme.dark': 'Donker',
-    'set.theme.auto': 'Automatisch',
-    
-    // Workout
-    'wk.nextSection': 'Volgende sectie',
-    'wk.hold': '🔒 Houd vast!',
-    'wk.ofReps': 'van {0} reps',
-    'wk.tapHint': 'Langzaam: ±4 sec. per rep',
-    'wk.tut.tooFast': 'Te snel! Behoud de spierspanning (Time Under Tension).',
-    'wk.seconds': 'seconden',
-    'wk.intro.encouragement1': 'Laten we beginnen, {0}! 🌿',
-    'wk.intro.encouragement2': 'Goed bezig, {0}! 💪',
-    'wk.intro.encouragement3': 'Klaar voor de volgende? 🔥',
-    'wk.intro.encouragement4': 'Je doet het geweldig! 🌟',
-    'wk.intro.btn': 'Laten we gaan →',
-
-    // Complete
-    'comp.title': 'Routine Voltooid!',
-    'comp.msg1': 'Geweldig gedaan, {0}! Je lichaam bedankt je. 💚',
-    'comp.msg2': 'Weer een workout erop! Elke dag een stapje sterker.',
-    'comp.msg3': 'Fantastisch! Consistentie is de sleutel. 🔑',
-    'comp.workoutsTotal': 'Workouts totaal',
-    'comp.currentWeek': 'Huidig',
-    'comp.btn.home': 'Terug naar Home',
-    'comp.btn.leaderboard': 'Bekijk Leaderboard 🏆',
-
-    // Community
-    'comm.title': 'Community 🏆',
-    'comm.logout': 'Log uit',
-    'comm.inviteCopy': '🔗 Invite Link Kopiëren',
-    'comm.inviteCopied': '✓ Gekopieerd!',
-    'comm.newGroup': '➕ Nieuwe Groep',
-    'comm.loading': 'Laden...',
-    'comm.empty': 'Nog niemand in deze groep.',
-    'comm.you': '(Jij)',
-    'comm.week': 'Week',
-    'comm.lastActive': 'Laatst actief:',
-    'comm.missed': 'gemist',
-
-    // Auth
-    'auth.title': 'Word lid van de Community',
-    'auth.sub1': 'Log in om je voortgang te vergelijken, samen met vrienden te trainen in privé groepen, en gemotiveerd te blijven.',
-    'auth.sub2': 'Log in om de uitnodiging voor groep <b>{0}</b> te accepteren!',
-    'auth.google': 'Ga verder met Google',
-    'auth.or': 'of',
-    'auth.email': 'E-mailadres',
-    'auth.pass': 'Wachtwoord',
-    'auth.loginBtn': 'Inloggen',
-    'auth.regBtn': 'Registreren',
-
-    // Dialogs
-    'dlg.quit.title': 'Routine stoppen?',
-    'dlg.quit.msg': 'Je voortgang voor deze workout gaat verloren.',
-    'dlg.quit.confirm': 'Doorgaan',
-    'dlg.quit.cancel': 'Stoppen',
-    'dlg.reset.title': 'Voortgang resetten?',
-    'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
-    'dlg.resetAll.title': 'Alles resetten (Lokaal & Cloud)?',
-    'dlg.resetAll.msg': 'Je lokale profiel én je opgeslagen cloud-voortgang worden hiermee volledig gewist.',
-    'dlg.science.title': '🧘 Principes van de Routine',
-    'dlg.science.msg': 'Deze routine maakt gebruik van een <b>rustig herhalingstempo</b> en <b>geleidelijke opbouw</b>.<br><br><b>Rustig tempo:</b> Door gecontroleerd te bewegen focus je op balans, houding en spierbeheersing.<br><b>Geleidelijke opbouw:</b> Het programma verhoogt in stappen de intensiteit om je spieren op een veilige manier uit te dagen.<br><br>Daarom is te snel doorklikken geblokkeerd.',
-
-    // Workout skip/fail
-    'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',
-    'wk.notCompleted.title': 'Niet voltooid',
-    'wk.notCompleted.msg': 'Je hebt meer dan de helft van de oefeningen overgeslagen. Deze workout telt helaas niet mee voor je voortgang.',
-
-    // Community prompts
-    'comm.createPrompt': 'Naam:',
-    'comm.createSuccess.title': 'Groep aangemaakt!',
-    'comm.createSuccess.msg': 'Deel de invite link met je vrienden.',
-    'comm.createError': 'Fout bij maken groep.',
-    'auth.fieldsRequired': 'Vul je e-mail en wachtwoord in.',
-
-    // Settings level labels
-    'set.lvl.0': 'Uit (Niet trainen)',
-    'set.lvl.1': 'Beginner (Makkelijk)',
-    'set.lvl.2': 'Beginner+',
-    'set.lvl.3': 'Licht Gemiddeld',
-    'set.lvl.4': 'Gemiddeld',
-    'set.lvl.5': 'Gemiddeld+',
-    'set.lvl.6': 'Gevorderd',
-    'set.lvl.7': 'Gevorderd+',
-    'set.lvl.8': 'Expert',
-
-    'side.been': 'been',
-    'side.kant': 'kant',
-  },
-  en: {
-    'side.been': 'leg',
-    'side.kant': 'side',
-    // Shared
-    'btn.back': '← Back',
-    'btn.save': 'Save',
-    'btn.cancel': 'Cancel',
-    'btn.confirm': 'Confirm',
-    'btn.next': 'Next →',
-    'btn.quit': '✕ Quit',
-    'btn.skip': 'Skip',
-    'btn.start': '▶ Start',
-    'btn.pause': '⏸ Pause',
-    'btn.finish': 'Finish ✓',
-    'nav.home': 'Home',
-    'nav.coach': 'Coach',
-    'nav.community': 'Community',
-    'nav.settings': 'Settings',
-
-    // Home
-    'home.greeting': 'Hi',
-    'home.minPerDay': 'min per day',
-    'home.daysPerWeek': 'days per week',
-    'home.avgLevel': 'Avg. Level',
-    'home.today': 'Today',
-    'home.doneToday': 'Already completed today — great job! 💚',
-    'home.playAgain': '✓ Practice Again',
-    'home.workouts': 'Workouts',
-    'home.weeks': 'Weeks',
-    'home.intensity': 'Intensity',
-    'home.scienceBadge': 'How the routine works',
-    'home.quote': '♥ Your consistency today is your result tomorrow. ♥',
-
-    // Calendar
-    'calendar.title': '📅 Schedule',
-    'calendar.reset': 'Reset Progress',
-    'calendar.days': ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-
-    // Onboarding
-    'ob.step.of': 'Step {0} of {1}',
-    'ob.welcome.title': 'Welcome!',
-    'ob.welcome.sub': "Let's set up your Pilates routine.",
-    'ob.name.label': 'What should we call you?',
-    'ob.name.placeholder': 'Your name...',
-    'ob.gender.title': 'What is your gender?',
-    'ob.gender.sub': 'We tailor the exercises based on this.',
-    'ob.gender.f': 'Female',
-    'ob.gender.m': 'Male',
-    'ob.gender.n': 'Prefer not to say',
-    'ob.goals.title': 'What do you want to work on',
-    'ob.goals.sub': 'Choose one or more focus areas.',
-    'ob.goals.legs': 'Glutes & Legs',
-    'ob.goals.core': 'Core, Abs & Arms',
-    'ob.goals.back': 'Back & Posture',
-    'ob.goals.all': 'Everything',
-    'ob.level.title': 'What is your starting level?',
-    'ob.level.sub': 'We will slowly build up the intensity from here.',
-    'ob.level.beg.title': 'Beginner (Easy)',
-    'ob.level.beg.desc': 'Start off slowly.',
-    'ob.level.int.title': 'Intermediate',
-    'ob.level.int.desc': 'You have some experience.',
-    'ob.level.adv.title': 'Advanced',
-    'ob.level.adv.desc': 'Ready for a challenge!',
-    'ob.time.title': 'Time & Frequency',
-    'ob.time.sub': 'How much time per day and how often per week?',
-    'ob.time.minLabel': 'Minutes per day',
-    'ob.time.daysLabel': 'Days per week',
-    'ob.start.title': 'When are you starting?',
-    'ob.start.sub': 'The routine will start on this date.',
-    'ob.btn.start': 'Start! 🎉',
-
-    // Settings
-    'set.title': 'Settings',
-    'set.name': 'Name',
-    'set.startDate': 'Routine Start Date',
-    'set.lvl.core': 'Level Core, Abs & Arms',
-    'set.lvl.legs': 'Level Glutes & Legs',
-    'set.lvl.back': 'Level Back & Posture',
-    'set.gender': 'Gender',
-    'set.goals': 'Focus Areas',
-    'set.stretch': 'Include stretch',
-    'set.resetAll': 'Reset Everything & Start Over',
-    'set.language': 'Language',
-    'set.theme': 'Theme',
-    'set.theme.light': 'Light',
-    'set.theme.dark': 'Dark',
-    'set.theme.auto': 'Auto',
-
-    // Workout
-    'wk.nextSection': 'Next section',
-    'wk.hold': '🔒 Hold it!',
-    'wk.ofReps': 'of {0} reps',
-    'wk.tapHint': 'Slow: ±4 sec. per rep',
-    'wk.tut.tooFast': 'Too fast! Maintain Time Under Tension (TUT).',
-    'wk.seconds': 'seconds',
-    'wk.intro.encouragement1': "Let's begin, {0}! 🌿",
-    'wk.intro.encouragement2': 'Great job, {0}! 💪',
-    'wk.intro.encouragement3': 'Ready for the next one? 🔥',
-    'wk.intro.encouragement4': "You're doing amazing! 🌟",
-    'wk.intro.btn': "Let's go →",
-
-    // Complete
-    'comp.title': 'Routine Completed!',
-    'comp.msg1': 'Amazing job, {0}! Your body thanks you. 💚',
-    'comp.msg2': 'Another workout in the bag! A little stronger every day.',
-    'comp.msg3': 'Fantastic! Consistency is key. 🔑',
-    'comp.workoutsTotal': 'Total Workouts',
-    'comp.currentWeek': 'Current',
-    'comp.btn.home': 'Back to Home',
-    'comp.btn.leaderboard': 'View Leaderboard 🏆',
-
-    // Community
-    'comm.title': 'Community 🏆',
-    'comm.logout': 'Logout',
-    'comm.inviteCopy': '🔗 Copy Invite Link',
-    'comm.inviteCopied': '✓ Copied!',
-    'comm.newGroup': '➕ New Group',
-    'comm.loading': 'Loading...',
-    'comm.empty': 'No one in this group yet.',
-    'comm.you': '(You)',
-    'comm.week': 'Week',
-    'comm.lastActive': 'Last active:',
-    'comm.missed': 'missed',
-
-    // Auth
-    'auth.title': 'Join the Community',
-    'auth.sub1': 'Log in to compare your progress, work out with friends in private groups, and stay motivated.',
-    'auth.sub2': 'Log in to accept the invite for group <b>{0}</b>!',
-    'auth.google': 'Continue with Google',
-    'auth.or': 'or',
-    'auth.email': 'Email Address',
-    'auth.pass': 'Password',
-    'auth.loginBtn': 'Login',
-    'auth.regBtn': 'Register',
-
-    // Dialogs
-    'dlg.quit.title': 'Quit routine?',
-    'dlg.quit.msg': 'Your progress for this workout will be lost.',
-    'dlg.quit.confirm': 'Continue Workout',
-    'dlg.quit.cancel': 'Quit', 
-    'dlg.reset.title': 'Reset progress?',
-    'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
-    'dlg.resetAll.title': 'Reset everything?',
-    'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
-    'dlg.science.title': '🧘 Routine Principles',
-    'dlg.science.msg': 'This routine utilizes a <b>controlled rep tempo</b> and <b>gradual progression</b>.<br><br><b>Controlled Tempo:</b> Moving with control helps focus on balance, posture, and muscle engagement.<br><b>Gradual Progression:</b> The program steps up intensity gradually to challenge your muscles safely.<br><br>Fast clicking is paused to encourage mindful execution.',
-
-    // Workout skip/fail
-    'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',
-    'wk.notCompleted.title': 'Not Completed',
-    'wk.notCompleted.msg': 'You skipped more than half of the exercises. This workout does not count towards your progress.',
-
-    // Community prompts
-    'comm.createPrompt': 'Name:',
-    'comm.createSuccess.title': 'Group created!',
-    'comm.createSuccess.msg': 'Share the invite link with your friends.',
-    'comm.createError': 'Error creating group.',
-    'auth.fieldsRequired': 'Please enter your email and password.',
-
-    // Settings level labels
-    'set.lvl.0': 'Off (Do not train)',
-    'set.lvl.1': 'Beginner (Easy)',
-    'set.lvl.2': 'Beginner+',
-    'set.lvl.3': 'Light Intermediate',
-    'set.lvl.4': 'Intermediate',
-    'set.lvl.5': 'Intermediate+',
-    'set.lvl.6': 'Advanced',
-    'set.lvl.7': 'Advanced+',
-    'set.lvl.8': 'Expert',
-  }
-};
-
-export function getLanguage() {
-  const profile = getProfile();
-  return profile?.language || 'nl';
-}
-
-export function t(key, ...args) {
-  const lang = getLanguage();
-  let text = translations[lang][key] || translations['nl'][key] || key;
-  
-  if (args && args.length > 0) {
-    args.forEach((arg, i) => {
-      text = text.replace(`{${i}}`, arg);
-    });
-  }
-  return text;
-}
-
-`
-
-## Bestand: src/utils/scheduler.js
-`javascript
-/**
- * Scheduler — determines which sections to train today
- * based on user goals and day rotation.
- */
-
-import { SECTIONS } from '../data/exercises.js';
-import { getProfile, getProgramStartDate, formatDate, getTotalCompleted } from './storage.js';
-
-/**
- * Goal ID to section mapping.
- */
-const GOAL_SECTIONS = {
-  'billen-benen': ['benen-billen'],
-  'core': ['core'],
-  'rug': ['rug-houding'],
-  'alles': ['benen-billen', 'core', 'rug-houding'],
-};
-
-/**
- * Goal ID to display info.
- */
-export const GOAL_INFO = {
-  'billen-benen': { emoji: '🦵', label: 'Billen & Benen', color: '#D4A0A0' },
-  'core': { emoji: '🧱', label: 'Core, Buik & Armen', color: '#C4A882' },
-  'rug': { emoji: '🧘', label: 'Rug & Houding', color: '#B8A9C9' },
-  'alles': { emoji: '⭐', label: 'Alles', color: '#A8C09A' },
-};
-
-function getActiveGoals(profile) {
-  if (!profile) return ['alles'];
-
-  if (Array.isArray(profile.goals) && profile.goals.includes('alles')) {
-    return ['alles'];
-  }
-
-  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
-  const userGoals = Array.isArray(profile.goals) && profile.goals.length > 0 ? profile.goals : ['billen-benen', 'core', 'rug'];
-
-  const activeGoals = [];
-  if (userGoals.includes('core') && baseLevels.core !== 0) activeGoals.push('core');
-  if ((userGoals.includes('billen-benen') || userGoals.includes('benen-billen')) && baseLevels['benen-billen'] !== 0) activeGoals.push('billen-benen');
-  if (userGoals.includes('rug') && baseLevels['rug-houding'] !== 0) activeGoals.push('rug');
-
-  if (activeGoals.length === 3 || activeGoals.length === 0) return ['alles'];
-  return activeGoals;
-}
-
-/**
- * Get the sections to train today based on user profile.
- */
-export function getTodaysFocus() {
-  const profile = getProfile();
-  if (!profile) {
-    return {
-      sectionIds: ['warmup', 'benen-billen', 'core', 'rug-houding', 'stretch'],
-      focusLabel: 'Volledige Routine',
-      focusEmoji: '⭐',
-    };
-  }
-
-  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
-  const goals = getActiveGoals(profile);
-
-  if (goals.includes('alles')) {
-    const sectionIds = ['warmup'];
-    if (baseLevels.core > 0) sectionIds.push('core');
-    if (baseLevels['benen-billen'] > 0) sectionIds.push('benen-billen');
-    if (baseLevels['rug-houding'] > 0) sectionIds.push('rug-houding');
-    
-    const hasActiveSections = sectionIds.length > 1;
-    if (profile.includeStretch !== false) sectionIds.push('stretch');
-    
-    return {
-      sectionIds,
-      focusLabel: hasActiveSections ? 'Volledige Routine' : 'Herstel & Stretch',
-      focusEmoji: hasActiveSections ? '⭐' : '🧘',
-    };
-  }
-
-  if (goals.length === 1) {
-    const goal = goals[0];
-    const info = GOAL_INFO[goal];
-    const mainSections = GOAL_SECTIONS[goal] || [];
-    const sectionIds = ['warmup', ...mainSections];
-    if (profile.includeStretch !== false) sectionIds.push('stretch');
-    return {
-      sectionIds,
-      focusLabel: info.label,
-      focusEmoji: info.emoji,
-    };
-  }
-
-  const dayIndex = getWorkoutDayIndex();
-  const goalIndex = dayIndex % goals.length;
-  const todayGoal = goals[goalIndex];
-  const info = GOAL_INFO[todayGoal];
-  const mainSections = GOAL_SECTIONS[todayGoal] || [];
-  const sectionIds = ['warmup', ...mainSections];
-  if (profile.includeStretch !== false) sectionIds.push('stretch');
-
-  return {
-    sectionIds,
-    focusLabel: info.label,
-    focusEmoji: info.emoji,
-  };
-}
-
-export function getFocusForDate(dateStr) {
-  const profile = getProfile();
-  if (!profile) return GOAL_INFO['alles'];
-
-  const goals = getActiveGoals(profile);
-
-  if (goals.includes('alles') || goals.length === 1) {
-    const goal = goals.includes('alles') ? 'alles' : goals[0];
-    return GOAL_INFO[goal];
-  }
-
-  const startDate = getProgramStartDate();
-  if (!startDate) return GOAL_INFO['alles'];
-
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.floor((target - start) / (1000 * 60 * 60 * 24));
-  const goalIndex = ((diffDays % goals.length) + goals.length) % goals.length;
-
-  return GOAL_INFO[goals[goalIndex]];
-}
-
-export function getGoalSubtitle() {
-  const profile = getProfile();
-  if (!profile) return 'Strakke benen & strakke buik';
-
-  const goals = getActiveGoals(profile);
-
-  if (goals.includes('alles')) {
-    return 'Strakke benen, sterke core & gezonde rug';
-  }
-
-  const parts = goals.map(g => {
-    switch (g) {
-      case 'billen-benen': return 'strakke billen & benen';
-      case 'core': return 'sterke core & buik';
-      case 'rug': return 'gezonde rug & houding';
-      default: return '';
-    }
-  }).filter(Boolean);
-
-  return parts.join(' & ').replace(/^./, c => c.toUpperCase());
-}
-
-function getWorkoutDayIndex() {
-  return getTotalCompleted();
-}
-
-`
-
-## Bestand: src/utils/social.js
-`javascript
-import { db } from './firebase.js';
-import { getCurrentUser } from './auth.js';
-import { 
-  doc, setDoc, getDoc, getDocs, deleteDoc, writeBatch,
-  collection, arrayUnion, serverTimestamp 
-} from 'firebase/firestore';
-
-/**
- * Initialize or update user document in Firestore on login.
- */
-export async function initializeSocialUser(localProfile, localTotal = 0, localWeek = 1, localMissed = 0) {
-  try {
-    const user = getCurrentUser();
-    if (!user) return;
-
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-
-    let communities = ['global'];
-
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        name: localProfile.name || user.displayName || 'Pilates Fan',
-        totalWorkouts: localTotal || 0,
-        currentWeek: localWeek || 1,
-        missedWorkouts: localMissed || 0,
-        communities: communities,
-        lastActive: serverTimestamp()
-      });
-    } else {
-      const data = userSnap.data();
-      communities = data.communities || ['global'];
-      await setDoc(userRef, {
-        name: localProfile.name || data.name || user.displayName || 'Pilates Fan',
-        totalWorkouts: Math.max(localTotal, data.totalWorkouts || 0),
-        currentWeek: Math.max(localWeek, data.currentWeek || 1),
-        missedWorkouts: localMissed || data.missedWorkouts || 0,
-        communities: communities,
-        lastActive: serverTimestamp()
-      }, { merge: true });
-    }
-
-    return communities;
-  } catch (error) {
-    console.error("Error initializing social user:", error);
-  }
-}
-
-/**
- * Push the current user's progress to Firestore atomically across user and community member documents.
- */
-export async function pushUserProgress(data) {
-  const user = getCurrentUser();
-  if (!user) return; // Only push if authenticated
-
-  try {
-    const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
-
-    const batch = writeBatch(db);
-
-    batch.set(userRef, {
-      name: displayName,
-      totalWorkouts: data.totalWorkouts || 0,
-      currentWeek: data.currentWeek || 1,
-      missedWorkouts: data.missedWorkouts || 0,
-      lastActive: serverTimestamp()
-    }, { merge: true });
-
-    for (const commCode of communities) {
-      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
-      batch.set(memberRef, {
-        displayName: displayName,
-        score: data.totalWorkouts || 0,
-        currentWeek: data.currentWeek || 1,
-        lastActive: serverTimestamp()
-      }, { merge: true });
-    }
-
-    await batch.commit();
-  } catch (error) {
-    console.error("Error pushing progress in batch:", error);
-    throw error;
-  }
-}
-
-/**
- * Reset cloud progress for authenticated user, deleting user document and all community member entries atomically.
- */
-export async function resetCloudProgress() {
-  try {
-    const user = getCurrentUser();
-    if (!user) return;
-
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
-
-    const batch = writeBatch(db);
-
-    for (const commCode of communities) {
-      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
-      batch.delete(memberRef);
-    }
-
-    batch.delete(userRef);
-    await batch.commit();
-  } catch (error) {
-    console.warn("Could not delete cloud user documents:", error);
-  }
-}
-
-/**
- * Fetch the leaderboard for a specific community.
- */
-export async function getLeaderboard(communityCode = 'global') {
-  try {
-    const membersRef = collection(db, 'communities', communityCode, 'members');
-    const querySnapshot = await getDocs(membersRef);
-    
-    const leaderboard = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      let lastActiveStr = 'Onbekend';
-      if (data.lastActive && data.lastActive.toDate) {
-        lastActiveStr = data.lastActive.toDate().toLocaleDateString();
-      } else if (data.lastActive) {
-        lastActiveStr = new Date(data.lastActive).toLocaleDateString();
-      }
-
-      leaderboard.push({
-        id: doc.id,
-        name: data.displayName || 'Pilates Fan',
-        totalWorkouts: data.score || 0,
-        missedWorkouts: 0,
-        currentWeek: data.currentWeek || 1,
-        lastActive: lastActiveStr
-      });
-    });
-    
-    leaderboard.sort((a, b) => b.totalWorkouts - a.totalWorkouts);
-    return leaderboard;
-  } catch (error) {
-    console.error("Error fetching leaderboard:", error);
-    return [];
-  }
-}
-
-/**
- * Create a new community
- */
-function sanitizeText(str, maxLen = 40) {
-  if (!str || typeof str !== 'string') return '';
-  return str.replace(/<[^>]*>/g, '').trim().substring(0, maxLen);
-}
-
-export async function createCommunity(name) {
-  try {
-    const user = getCurrentUser();
-    if (!user) throw new Error("Not authenticated");
-
-    const cleanName = sanitizeText(name, 40);
-    if (!cleanName) throw new Error("Ongeldige groepsnaam.");
-
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    const commRef = doc(db, 'communities', code);
-    await setDoc(commRef, {
-      id: code,
-      name: cleanName,
-      ownerId: user.uid,
-      createdAt: serverTimestamp()
-    });
-
-    // Add owner to this community
-    const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      communities: arrayUnion(code)
-    }, { merge: true });
-
-    return code;
-  } catch (error) {
-    console.error("Error creating community:", error);
-    import('../ui/core.js').then(module => module.showToast('Fout bij maken groep.', 'error'));
-    throw error;
-  }
-}
-
-/**
- * Join an existing community by code
- */
-export async function joinCommunity(code) {
-  try {
-    const user = getCurrentUser();
-    if (!user) throw new Error("Not authenticated");
-
-    const formattedCode = code.trim().toUpperCase();
-
-    // Optionally verify if community exists
-    const commRef = doc(db, 'communities', formattedCode);
-    const commSnap = await getDoc(commRef);
-    
-    if (!commSnap.exists() && formattedCode !== 'GLOBAL') {
-      throw new Error("Community niet gevonden!");
-    }
-
-    const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      communities: arrayUnion(formattedCode)
-    }, { merge: true });
-
-    return formattedCode;
-  } catch (error) {
-    console.error("Error joining community:", error);
-    import('../ui/core.js').then(module => module.showToast(error.message || 'Fout bij joinen groep.', 'error'));
-    throw error;
-  }
-}
-
-/**
- * Get user's communities details
- */
-export async function getUserCommunities() {
-  try {
-    const user = getCurrentUser();
-    if (!user) return [];
-
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) return [{ id: 'global', name: 'Global' }];
-
-    const data = userSnap.data();
-    const codes = data.communities || ['global'];
-
-    const results = [];
-    for (const code of codes) {
-      if (code === 'global' || code === 'GLOBAL') {
-        results.push({ id: 'global', name: 'Global Community' });
-      } else {
-        const commRef = doc(db, 'communities', code);
-        const commSnap = await getDoc(commRef);
-        if (commSnap.exists()) {
-          results.push({ id: code, name: commSnap.data().name });
-        } else {
-          results.push({ id: code, name: `Groep ${code}` }); // Fallback
-        }
-      }
-    }
-
-    return results;
-  } catch (error) {
-    console.error("Error getting user communities:", error);
-    import('../ui/core.js').then(module => module.showToast('Kan groepen niet laden.', 'error'));
-    return [{ id: 'global', name: 'Global' }];
-  }
-}
-
-`
-
-## Bestand: src/utils/storage.js
-`javascript
-/**
- * LocalStorage utilities for user profile and 8-week progress tracking.
- *
- * Stores:
- * - User profile: name, goals, daily minutes, days per week
- * - Program: start date, completed days (with focus type)
- */
-
-const STORAGE_KEYS = {
-  PROFILE: 'pilates_user_profile',
-  COMPLETED_DAYS: 'pilates_completed_days',
-};
-
-// ═══════════════════════════════════════
-// USER PROFILE
-// ═══════════════════════════════════════
-
-/**
- * Default profile shape.
- */
-const DEFAULT_PROFILE = {
-  name: '',
-  goals: ['alles'],       // ['billen-benen', 'core', 'rug', 'alles']
-  dailyMinutes: 15,       // 10, 15, 20
-  daysPerWeek: 6,         // 3, 4, 5, 6
-  startDate: null,        // ISO date string
-  baseLevels: {
-    'core': 0,
-    'benen-billen': 0,
-    'rug-houding': 0
-  },
-  includeStretch: true,
-  onboardingComplete: false,
-  schemaVersion: 1,
-};
-
-export function parseLocalISODate(dateString) {
-  if (!dateString || typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    return null;
-  }
-  const [year, month, day] = dateString.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  date.setHours(0, 0, 0, 0);
-
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-    return null;
-  }
-  return date;
-}
-
-function clampInteger(value, min, max, fallback) {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed)) return fallback;
-  return Math.min(max, Math.max(min, parsed));
-}
-
-export function normalizeProfile(input = {}) {
-  return {
-    ...DEFAULT_PROFILE,
-    name: typeof input.name === 'string' ? input.name.trim().slice(0, 50) : '',
-    goals: Array.isArray(input.goals) 
-      ? input.goals.filter(g => ['alles', 'core', 'rug', 'benen-billen'].includes(g)) 
-      : ['alles'],
-    dailyMinutes: [10, 15, 20].includes(Number(input.dailyMinutes)) ? Number(input.dailyMinutes) : 15,
-    daysPerWeek: clampInteger(input.daysPerWeek, 1, 7, 6),
-    theme: ['auto', 'light', 'dark'].includes(input.theme) ? input.theme : 'auto',
-    language: ['nl', 'en'].includes(input.language) ? input.language : 'nl',
-    startDate: parseLocalISODate(input.startDate) ? input.startDate : formatDate(new Date()),
-    baseLevels: {
-      'core': clampInteger(input.baseLevels?.['core'], 0, 8, 1),
-      'benen-billen': clampInteger(input.baseLevels?.['benen-billen'], 0, 8, 1),
-      'rug-houding': clampInteger(input.baseLevels?.['rug-houding'], 0, 8, 1),
-    },
-    includeStretch: input.includeStretch !== false,
-    onboardingComplete: input.onboardingComplete === true,
-    schemaVersion: 2
-  };
-}
-
-/**
- * Get the user profile. Returns null if onboarding not complete.
- */
-export function getProfile() {
-  const stored = localStorage.getItem(STORAGE_KEYS.PROFILE);
-  if (stored) {
-    let parsed;
-    try {
-      parsed = JSON.parse(stored);
-    } catch (e) {
-      console.error('Failed to parse profile', e);
-      return null;
-    }
-    return normalizeProfile(parsed);
-  }
-  return null;
-}
-
-/**
- * Save the user profile.
- */
-export function saveProfile(profile) {
-  try {
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
-  } catch (e) {
-    console.error('Failed to save profile to localStorage', e);
-  }
-}
-
-/**
- * Check if onboarding is complete.
- */
-export function isOnboardingComplete() {
-  const profile = getProfile();
-  return profile && profile.onboardingComplete;
-}
-
-/**
- * Get the user's name.
- */
-export function getUserName() {
-  const profile = getProfile();
-  return profile ? profile.name : '';
-}
-
-/**
- * Get the program start date as a Date object.
- */
-export function getProgramStartDate() {
-  const profile = getProfile();
-  if (profile && profile.startDate) {
-    const parts = profile.startDate.split('-');
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10);
-      const day = parseInt(parts[2], 10);
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        return new Date(year, month - 1, day);
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Update the start date.
- */
-export function setStartDate(dateStr) {
-  const profile = getProfile();
-  if (profile) {
-    profile.startDate = dateStr;
-    saveProfile(profile);
-  }
-}
-
-// ═══════════════════════════════════════
-// COMPLETED DAYS
-// ═══════════════════════════════════════
-
-/**
- * Get all completed days as a Map of "YYYY-MM-DD" → focus type emoji.
- */
-export function getCompletedDays() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.COMPLETED_DAYS);
-    if (stored) {
-      let parsed;
-      try {
-        parsed = JSON.parse(stored);
-      } catch (e) {
-        console.error('Failed to parse completed days', e);
-        return {};
-      }
-      if (Array.isArray(parsed)) {
-        const map = {};
-        parsed.forEach(d => { map[d] = '✓'; });
-        return map;
-      }
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    }
-  } catch (e) {
-    console.error('Error reading completed days from localStorage', e);
-  }
-  return {};
-}
-
-/**
- * Mark today as completed with the given focus type.
- */
-export function markTodayComplete(focusEmoji = '✓') {
-  try {
-    const days = getCompletedDays();
-    const today = formatDate(new Date());
-    days[today] = focusEmoji;
-    localStorage.setItem(STORAGE_KEYS.COMPLETED_DAYS, JSON.stringify(days));
-  } catch (e) {
-    console.error('Failed to save completed day to localStorage', e);
-  }
-}
-
-/**
- * Check if today is already completed.
- */
-export function isTodayComplete() {
-  const days = getCompletedDays();
-  return formatDate(new Date()) in days;
-}
-
-/**
- * Get current week number (1-8) based on start date.
- * Returns 1 if program hasn't started or if before week 1.
- */
-export function getCurrentWeek() {
-  const startDate = getProgramStartDate();
-  if (!startDate) return 1;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
-
-  const diffMs = today - start;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const week = Math.floor(diffDays / 7) + 1;
-
-  return Math.min(Math.max(week, 1), 8);
-}
-
-/**
- * Get the total number of completed workouts.
- */
-export function getTotalCompleted() {
-  return Object.keys(getCompletedDays()).length;
-}
-
-/**
- * Calculate how many workouts the user has missed based on start date, daysPerWeek, and completed workouts.
- */
-export function getMissedWorkouts() {
-  const profile = getProfile();
-  const start = getProgramStartDate();
-  if (!profile || !start) return 0;
-
-  start.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const daysPassed = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-  if (daysPassed <= 0) return 0; // Started today or in the future
-
-  const weeksPassed = Math.floor(daysPassed / 7);
-  const remainingDays = daysPassed % 7;
-  
-  // Total workouts they should have done up to yesterday
-  const expectedWorkouts = (weeksPassed * profile.daysPerWeek) + Math.min(remainingDays, profile.daysPerWeek);
-  
-  const totalCompleted = getTotalCompleted();
-  
-  return Math.max(0, expectedWorkouts - totalCompleted);
-}
-
-/**
- * Build the 8-week calendar data using actual dates from start date.
- * Each cell contains real dates, completion status, and focus icons.
- */
-export function buildCalendarData() {
-  const startDate = getProgramStartDate();
-  const completedDays = getCompletedDays();
-  const currentWeek = getCurrentWeek();
-  const todayStr = formatDate(new Date());
-
-  const weeks = [];
-  const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
-
-  for (let w = 0; w < 8; w++) {
-    const days = [];
-    for (let d = 0; d < 7; d++) {
-      if (startDate) {
-        const date = new Date(startDate);
-        date.setHours(0, 0, 0, 0);
-        date.setDate(date.getDate() + w * 7 + d);
-        const dateStr = formatDate(date);
-
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-
-        days.push({
-          date: dateStr,
-          dayNumber: date.getDate(),
-          monthLabel: MONTHS[date.getMonth()],
-          dayOfWeek: d,
-          isCompleted: dateStr in completedDays,
-          completedIcon: completedDays[dateStr] || null,
-          isToday: dateStr === todayStr,
-          isPast: date < now,
-          isFuture: date > now,
-        });
-      } else {
-        days.push({
-          date: null,
-          dayNumber: null,
-          monthLabel: null,
-          dayOfWeek: d,
-          isCompleted: false,
-          completedIcon: null,
-          isToday: false,
-          isPast: false,
-          isFuture: true,
-        });
-      }
-    }
-
-    // Determine week date range label
-    let weekLabel = `Week ${w + 1}`;
-    if (startDate && days[0].date && days[6].date) {
-      const first = days[0];
-      const last = days[6];
-      if (first.monthLabel === last.monthLabel) {
-        weekLabel = `${first.dayNumber}–${last.dayNumber} ${first.monthLabel}`;
-      } else {
-        weekLabel = `${first.dayNumber} ${first.monthLabel}–${last.dayNumber} ${last.monthLabel}`;
-      }
-    }
-
-    weeks.push({
-      weekNumber: w + 1,
-      isCurrent: currentWeek === w + 1,
-      weekLabel,
-      days,
-    });
-  }
-
-  return weeks;
-}
-
-/**
- * Reset all progress data (keeps profile).
- */
-export function resetProgress() {
-  localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
-  const profile = getProfile();
-  if (profile) {
-    profile.startDate = new Date().toISOString().split('T')[0];
-    saveProfile(profile);
-  }
-}
-
-/**
- * Reset everything including profile (full reset of local and cloud progress).
- */
-export async function resetAll() {
-  try {
-    localStorage.removeItem(STORAGE_KEYS.PROFILE);
-    localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
-    localStorage.removeItem('pilates_pending_invite');
-    const { resetCloudProgress } = await import('./social.js');
-    await resetCloudProgress();
-  } catch (e) {
-    console.error('Error during resetAll:', e);
-  }
-}
-
-/**
- * Format a Date to "YYYY-MM-DD" string.
- */
-export function formatDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-`
+```
 
 ## Bestand: src/ui/core.js
-`javascript
+
+```javascript
 import { state } from '../state.js';
 import { renderOnboarding } from './screens/onboardingScreen.js';
 import { renderHome } from './screens/homeScreen.js';
@@ -5259,10 +3525,11 @@ export function playBeep() {
   }
 }
 
-`
+```
 
 ## Bestand: src/ui/components/navigation.js
-`javascript
+
+```javascript
 import { state } from '../../state.js';
 import { t } from '../../utils/i18n.js';
 import { render } from '../core.js';
@@ -5308,10 +3575,11 @@ export function attachBottomNavListeners() {
   });
 }
 
-`
+```
 
 ## Bestand: src/ui/screens/coachScreen.js
-`javascript
+
+```javascript
 import { app, showToast, showDialog, escapeHTML, registerScreenCleanup } from '../core.js';
 import { getBottomNavHTML, attachBottomNavListeners } from '../components/navigation.js';
 import { db } from '../../utils/firebase.js';
@@ -5788,10 +4056,11 @@ function getModelName(id) {
   return found ? found.name : id;
 }
 
-`
+```
 
 ## Bestand: src/ui/screens/communityScreen.js
-`javascript
+
+```javascript
 import { state } from '../../state.js';
 import { app, render, showPrompt, showDialog, showToast, escapeHTML } from '../core.js';
 import { loginWithGoogle, loginWithEmail, registerWithEmail, logout } from '../../utils/auth.js';
@@ -5984,10 +4253,11 @@ function renderCommunity() {
   });
 }
 
-`
+```
 
 ## Bestand: src/ui/screens/completeScreen.js
-`javascript
+
+```javascript
 import { state } from '../../state.js';
 import { app, render } from '../core.js';
 import { getUserName, getTotalCompleted, getCurrentWeek } from '../../utils/storage.js';
@@ -6044,10 +4314,11 @@ export function renderComplete() {
   });
 }
 
-`
+```
 
 ## Bestand: src/ui/screens/homeScreen.js
-`javascript
+
+```javascript
 import { state } from '../../state.js';
 import { app, render, escapeHTML, showDialog } from '../core.js';
 import { getProfile, getUserName, isTodayComplete, getTotalCompleted, getCurrentWeek, getProgramStartDate, buildCalendarData, resetProgress } from '../../utils/storage.js';
@@ -6261,10 +4532,11 @@ function handleReset() {
 
 import { startWorkout } from './workoutScreen.js';
 
-`
+```
 
 ## Bestand: src/ui/screens/onboardingScreen.js
-`javascript
+
+```javascript
 import { state } from '../../state.js';
 import { app, render, escapeHTML } from '../core.js';
 import { saveProfile, formatDate } from '../../utils/storage.js';
@@ -6467,15 +4739,22 @@ function attachOnboardingListeners(step, totalSteps = 4) {
 
 function saveStepData(step) {
   if (step === 0) {
-    state.onboardingData.name = document.getElementById('ob-name').value.trim();
-  } else if (step === 2) {
-    state.onboardingData.baseLevels = {
-      core: parseInt(document.getElementById('ob-level-core').value),
-      'benen-billen': parseInt(document.getElementById('ob-level-benen').value),
-      'rug-houding': parseInt(document.getElementById('ob-level-rug').value),
-    };
-  } else if (step === 4) {
-    state.onboardingData.startDate = document.getElementById('ob-start-date').value;
+    const el = document.getElementById('ob-name');
+    if (el) state.onboardingData.name = el.value.trim();
+  } else if (step === 1) {
+    const coreEl = document.getElementById('ob-level-core');
+    const benenEl = document.getElementById('ob-level-benen');
+    const rugEl = document.getElementById('ob-level-rug');
+    if (coreEl && benenEl && rugEl) {
+      state.onboardingData.baseLevels = {
+        core: parseInt(coreEl.value),
+        'benen-billen': parseInt(benenEl.value),
+        'rug-houding': parseInt(rugEl.value),
+      };
+    }
+  } else if (step === 3) {
+    const el = document.getElementById('ob-start-date');
+    if (el) state.onboardingData.startDate = el.value;
   }
 }
 
@@ -6486,10 +4765,11 @@ function completeOnboarding() {
   render();
 }
 
-`
+```
 
 ## Bestand: src/ui/screens/settingsScreen.js
-`javascript
+
+```javascript
 import { state } from '../../state.js';
 import { app, render, showDialog, escapeHTML } from '../core.js';
 import { getProfile, saveProfile, resetAll, formatDate } from '../../utils/storage.js';
@@ -6682,10 +4962,11 @@ export function renderSettings() {
   });
 }
 
-`
+```
 
 ## Bestand: src/ui/screens/workoutScreen.js
-`javascript
+
+```javascript
 import { state } from '../../state.js';
 import { app, render, showDialog, showToast, playBeep, escapeHTML } from '../core.js';
 import { getUserName, getProfile, markTodayComplete, getTotalCompleted, getMissedWorkouts } from '../../utils/storage.js';
@@ -7252,10 +5533,1819 @@ function handleQuit() {
   );
 }
 
-`
+```
+
+## Bestand: src/utils/aiService.js
+
+```javascript
+import { CreateMLCEngine } from '@mlc-ai/web-llm';
+
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL; // Optional backend proxy endpoint
+
+export const AVAILABLE_LOCAL_MODELS = [
+  {
+    id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+    name: 'Meta Llama 3.2 (1B)',
+    size: '~880 MB',
+    badge: 'Nieuw & Aanbevolen',
+    desc: 'Meta\'s nieuwste lightweight on-device model. Zeer slim en efficiënt.',
+    recommendedRAM: '2GB+'
+  },
+  {
+    id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',
+    name: 'Meta Llama 3.2 (3B)',
+    size: '~1.9 GB',
+    badge: 'High Quality',
+    desc: 'Bovenklasse redeneervermogen van Meta op het apparaat.',
+    recommendedRAM: '4GB+'
+  },
+  {
+    id: 'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
+    name: 'DeepSeek R1 Distill (1.5B)',
+    size: '~1.1 GB',
+    badge: 'Reasoning AI',
+    desc: 'Het populaire DeepSeek R1 redeneermodel, geoptimaliseerd voor mobiel.',
+    recommendedRAM: '2.5GB+'
+  },
+  {
+    id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
+    name: 'Qwen 2.5 (1.5B)',
+    size: '~1.2 GB',
+    badge: 'Top Meertalig',
+    desc: 'Uitstekend in Nederlands en nauwkeurig opvolgen van instructies.',
+    recommendedRAM: '2.5GB+'
+  },
+  {
+    id: 'gemma-2-2b-it-q4f16_1-MLC',
+    name: 'Google Gemma 2 (2B)',
+    size: '~1.5 GB',
+    badge: 'Google AI',
+    desc: 'Google\'s 2e generatie Gemma model voor on-device taken.',
+    recommendedRAM: '3GB+'
+  },
+  {
+    id: 'SmolLM-360M-Instruct-q4f16_1-MLC',
+    name: 'SmolLM (360M)',
+    size: '~350 MB',
+    badge: 'Ultra-Licht',
+    desc: 'Super compact. Werkt soepel op vrijwel elk mobiel toestel.',
+    recommendedRAM: '1GB+'
+  }
+];
+
+
+const STORAGE_KEYS = {
+  PROVIDER: 'ai_provider', // 'cloud' | 'local'
+  MODEL_ID: 'ai_local_model' // Selected local model ID
+};
+
+let mlcEngine = null;
+let currentEngineModelId = null;
+let initializationPromise = null;
+
+export function getAIProvider() {
+  return localStorage.getItem(STORAGE_KEYS.PROVIDER) || 'cloud';
+}
+
+export function setAIProvider(provider) {
+  if (provider !== 'cloud' && provider !== 'local') return;
+  localStorage.setItem(STORAGE_KEYS.PROVIDER, provider);
+}
+
+export function getSelectedLocalModelId() {
+  return localStorage.getItem(STORAGE_KEYS.MODEL_ID) || 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+}
+
+export function setSelectedLocalModelId(modelId) {
+  localStorage.setItem(STORAGE_KEYS.MODEL_ID, modelId);
+}
+
+export async function checkWebGPUSupport() {
+  if (!navigator.gpu) {
+    return {
+      supported: false,
+      reason: 'WebGPU is niet ondersteund in deze browser of WebView. Gebruik Google Gemini (Cloud).'
+    };
+  }
+
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) {
+      return {
+        supported: false,
+        reason: 'Geen geschikte WebGPU grafische adapter gevonden op dit apparaat.'
+      };
+    }
+    return { supported: true, reason: 'WebGPU is beschikbaar' };
+  } catch (e) {
+    return {
+      supported: false,
+      reason: `WebGPU controle mislukt: ${e.message}`
+    };
+  }
+}
+
+export async function initLocalEngine(modelId = null, onProgress = null) {
+  const selectedModel = modelId || getSelectedLocalModelId();
+  if (mlcEngine && currentEngineModelId === selectedModel) {
+    return mlcEngine;
+  }
+
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  initializationPromise = (async () => {
+    const gpuCheck = await checkWebGPUSupport();
+    if (!gpuCheck.supported) {
+      throw new Error(gpuCheck.reason);
+    }
+    const engine = await CreateMLCEngine(selectedModel, {
+      initProgressCallback: (progress) => {
+        if (onProgress) {
+          const text = progress.text || 'Laden...';
+          const pct = Math.round((progress.progress || 0) * 100);
+          onProgress(text, pct);
+        }
+      }
+    });
+    mlcEngine = engine;
+    currentEngineModelId = selectedModel;
+    return engine;
+  })();
+
+  try {
+    return await initializationPromise;
+  } catch (err) {
+    mlcEngine = null;
+    currentEngineModelId = null;
+    throw new Error(`Fout bij laden van lokaal model (${selectedModel}): ${err.message}`);
+  } finally {
+    initializationPromise = null;
+  }
+}
+
+export function isEngineLoaded() {
+  return mlcEngine !== null;
+}
+
+export async function generateAIResponse({ prompt, history = [], systemInstruction = '', onProgress = null }) {
+  const provider = getAIProvider();
+
+  if (provider === 'local') {
+    const engine = await initLocalEngine(null, onProgress);
+
+    const formattedMessages = [];
+    if (systemInstruction) {
+      formattedMessages.push({ role: 'system', content: systemInstruction });
+    }
+
+    history.forEach((msg) => {
+      const role = msg.role === 'model' ? 'assistant' : msg.role;
+      const text = msg.parts ? msg.parts.map(p => p.text).join('\n') : (msg.text || '');
+      if (text) {
+        formattedMessages.push({ role: role, content: text });
+      }
+    });
+
+    formattedMessages.push({ role: 'user', content: prompt });
+
+    const completion = await engine.chat.completions.create({
+      messages: formattedMessages,
+      temperature: 0.7,
+      max_tokens: 256
+    });
+
+    return completion.choices[0]?.message?.content || 'Geen antwoord gegenereerd.';
+  } else {
+    // Cloud API via Google Gemini REST API
+    if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
+      throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie.');
+    }
+
+    const contentsHistory = [];
+    history.forEach(msg => {
+      const role = msg.role === 'user' ? 'user' : 'model';
+      const text = msg.parts ? msg.parts[0]?.text : (msg.text || '');
+      contentsHistory.push({ role, parts: [{ text }] });
+    });
+    contentsHistory.push({ role: 'user', parts: [{ text: prompt }] });
+
+    // Sanitize strictly alternating roles
+    const historyClean = [];
+    let lastRole = null;
+    for (const msg of contentsHistory) {
+      if (msg.role !== lastRole) {
+        historyClean.push(msg);
+        lastRole = msg.role;
+      } else {
+        historyClean[historyClean.length - 1].parts[0].text += '\n' + msg.parts[0].text;
+      }
+    }
+
+    const targetEndpoint = AI_PROXY_URL 
+      ? AI_PROXY_URL 
+      : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(targetEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: historyClean,
+        systemInstruction: systemInstruction ? { role: 'system', parts: [{ text: systemInstruction }] } : undefined,
+        generationConfig: { temperature: 0.7 }
+      })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error?.message || 'Fout bij aanroepen van Gemini API');
+    }
+
+    const responseData = await response.json();
+    return responseData.candidates?.[0]?.content?.parts?.[0]?.text || 'Geen antwoord ontvangen van Gemini Cloud.';
+  }
+}
+
+function seekVideo(video, time, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Video-seek duurde te lang.'));
+    }, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('error', handleError);
+    }
+
+    function handleSeeked() {
+      cleanup();
+      resolve();
+    }
+
+    function handleError() {
+      cleanup();
+      reject(new Error('Video-frame kon niet geladen worden.'));
+    }
+
+    video.addEventListener('seeked', handleSeeked, { once: true });
+    video.addEventListener('error', handleError, { once: true });
+    video.currentTime = time;
+  });
+}
+
+export async function extractVideoKeyframes(videoFile, numFrames = 4) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(videoFile);
+    video.preload = 'metadata';
+    video.src = objectUrl;
+    video.muted = true;
+    video.playsInline = true;
+
+    video.onloadedmetadata = async () => {
+      try {
+        const duration = Number(video.duration);
+        if (!Number.isFinite(duration) || duration <= 0) {
+          throw new Error('De videoduur kon niet worden bepaald.');
+        }
+
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        if (!width || !height) {
+          throw new Error('De video heeft geen geldige afmetingen.');
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.min(width, 800);
+        canvas.height = Math.round((canvas.width / width) * height);
+        const ctx = canvas.getContext('2d');
+
+        const frames = [];
+        const interval = duration / (numFrames + 1);
+
+        for (let i = 1; i <= numFrames; i++) {
+          const time = interval * i;
+          await seekVideo(video, time, 8000);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          frames.push(dataUrl.split(',')[1]);
+        }
+
+        resolve(frames);
+      } catch (err) {
+        reject(err);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Fout bij het laden van het videobestand in de browser.'));
+    };
+  });
+}
+
+export async function extractImagePayload(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      const separatorIndex = result.indexOf(',');
+      if (separatorIndex < 0) {
+        reject(new Error('Ongeldige afbeeldingsdata.'));
+        return;
+      }
+      resolve({
+        mimeType: file.type || 'image/jpeg',
+        data: result.slice(separatorIndex + 1)
+      });
+    };
+    reader.onerror = err => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
+
+export function validateFormCheckFile(file) {
+  if (!(file instanceof File)) {
+    throw new Error('Geen geldig bestand geselecteerd.');
+  }
+
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+
+  if (!isImage && !isVideo) {
+    throw new Error('Selecteer een afbeelding of een videobestand.');
+  }
+
+  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (file.size > maxBytes) {
+    const maxMb = Math.round(maxBytes / (1024 * 1024));
+    throw new Error(`Het bestand mag maximaal ${maxMb} MB zijn.`);
+  }
+
+  return { isImage, isVideo };
+}
+
+export async function analyzeVideoForm({ file, exerciseName = 'Pilates oefening', onProgress = null }) {
+  if (!AI_PROXY_URL && (!GEMINI_API_KEY || GEMINI_API_KEY === 'PLAK_HIER_JE_SLEUTEL')) {
+    throw new Error('Google Gemini API-sleutel of Proxy URL ontbreekt in de configuratie voor video-analyse.');
+  }
+
+  const { isImage, isVideo } = validateFormCheckFile(file);
+  let inlineParts = [];
+
+  if (isVideo) {
+    if (onProgress) onProgress('Video keyframes verwerken...', 30);
+    const frames = await extractVideoKeyframes(file, 4);
+    inlineParts = frames.map(f => ({
+      inlineData: { mimeType: 'image/jpeg', data: f }
+    }));
+  } else if (isImage) {
+    if (onProgress) onProgress('Afbeelding verwerken...', 50);
+    const imgPayload = await extractImagePayload(file);
+    inlineParts = [{
+      inlineData: imgPayload
+    }];
+  }
+
+  if (onProgress) onProgress('Anatomische analyse uitvoeren via Kiné Gemini Multimodal Cloud...', 70);
+
+  const FORM_CHECK_SYSTEM_INSTRUCTION = `Je geeft uitsluitend algemene, educatieve bewegings- en houdingsfeedback.
+Belangrijke beperkingen:
+- Stel geen medische diagnose.
+- Beoordeel geen blessures, pijnklachten of medische aandoeningen.
+- Doe geen uitspraken alsof stilstaande beelden volledige zekerheid bieden.
+- Benoem onzekerheid wanneer camerahoek of kleding de beoordeling beperkt.
+- Adviseer te stoppen bij pijn of duizeligheid en verwijs bij klachten naar een bevoegde arts of fysiotherapeut.
+- Gebruik neutrale termen zoals "mogelijk zichtbaar" en "op basis van deze beelden".`;
+
+  const promptText = `${FORM_CHECK_SYSTEM_INSTRUCTION}
+
+Analyseer de geüploade beelden van de oefening ("${exerciseName}"). Geef een heldere en educatieve beoordeling in het Nederlands met de volgende opbouw:
+
+🧘 **Mogelijk Zichtbare Uitlijning**: Wat valt op aan de positie op basis van deze beelden?
+⚠️ **Aandachtspunten**: Waar zit mogelijke compensatie (bijv. bekken, schouders, wervelkolom)?
+💡 **3 Bewegingstips**: Geef 3 algemene tips om de controle te verbeteren.`;
+
+  const targetEndpoint = AI_PROXY_URL 
+    ? AI_PROXY_URL 
+    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+
+  const response = await fetch(targetEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: promptText },
+          ...inlineParts
+        ]
+      }],
+      generationConfig: { temperature: 0.4 }
+    })
+  });
+
+  if (onProgress) onProgress('Rapport genereren...', 95);
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error?.message || 'Fout bij verzenden van beelden naar Gemini Multimodal API.');
+  }
+
+  const responseData = await response.json();
+  const feedbackText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!feedbackText) {
+    throw new Error('Geen analyse-uitslag ontvangen van de Multimodale AI.');
+  }
+
+  return feedbackText;
+}
+
+
+```
+
+## Bestand: src/utils/auth.js
+
+```javascript
+import { auth } from './firebase.js';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithCredential,
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+
+const googleProvider = new GoogleAuthProvider();
+
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+
+// Detect if running inside Capacitor (native app)
+function isNativeApp() {
+  return window.Capacitor?.isNative === true;
+}
+
+// Initialize GoogleAuth only on web platform (native platforms use configuration files and crash on initialize)
+if (!isNativeApp()) {
+  GoogleAuth.initialize({
+    clientId: '443627015452-607m0jgju0crolb3vptrib6a0ej3jfdu.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
+    grantOfflineAccess: true,
+  });
+}
+
+export function subscribeToAuth(callback) {
+  // Check for redirect result on app load (for native flow, if we ever fallback)
+  getRedirectResult(auth).catch(() => {});
+  return onAuthStateChanged(auth, callback);
+}
+
+export function getCurrentUser() {
+  return auth.currentUser;
+}
+
+export async function loginWithGoogle() {
+  try {
+    if (isNativeApp()) {
+      // In native app, use the Capacitor Google Auth plugin
+      const googleUser = await GoogleAuth.signIn();
+      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+      const result = await signInWithCredential(auth, credential);
+      return { user: result.user, error: null };
+    } else {
+      // On web, use popup
+      const result = await signInWithPopup(auth, googleProvider);
+      return { user: result.user, error: null };
+    }
+  } catch (error) {
+    return { user: null, error: error.message };
+  }
+}
+
+export async function loginWithEmail(email, password) {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    return { user: result.user, error: null };
+  } catch (error) {
+    return { user: null, error: error.message };
+  }
+}
+
+export async function registerWithEmail(email, password) {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    return { user: result.user, error: null };
+  } catch (error) {
+    return { user: null, error: error.message };
+  }
+}
+
+export async function logout() {
+  await signOut(auth);
+}
+
+
+```
+
+## Bestand: src/utils/bluetooth.js
+
+```javascript
+import { BleClient } from '@capacitor-community/bluetooth-le';
+
+const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
+const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
+
+export function isPlausibleHeartRate(value) {
+  return Number.isInteger(value) && value >= 30 && value <= 240;
+}
+
+/**
+ * Connects to a Bluetooth Low Energy Heart Rate Monitor.
+ * Requests the user to select a device broadcasting the Heart Rate Service.
+ * @param {Function} onHeartRateUpdate Callback fired when a new BPM is received.
+ * @param {Function} onDisconnect Callback fired when the device disconnects.
+ * @returns {Promise<string>} The device ID of the connected monitor.
+ */
+export async function connectHeartRateMonitor(onHeartRateUpdate, onDisconnect) {
+  try {
+    // Initialize the BLE client (requests necessary permissions on Android/iOS)
+    await BleClient.initialize();
+
+    // Request device that broadcasts the HR service
+    const device = await BleClient.requestDevice({
+      services: [HEART_RATE_SERVICE],
+    });
+
+    // Connect to the device
+    await BleClient.connect(device.deviceId, (disconnectedDeviceId) => {
+      console.log(`Smartwatch disconnected: ${disconnectedDeviceId}`);
+      if (onDisconnect) onDisconnect();
+    });
+
+    // Start receiving notifications
+    await BleClient.startNotifications(
+      device.deviceId,
+      HEART_RATE_SERVICE,
+      HEART_RATE_MEASUREMENT,
+      (value) => {
+        // Parse the characteristic value according to GATT specifications
+        // Value is a DataView. The first byte contains flags.
+        const flags = value.getUint8(0);
+        // If the 0th bit is 0, heart rate format is 8-bit (UINT8)
+        // If 1, format is 16-bit (UINT16)
+        const is16BitFormat = flags & 0x01;
+        
+        let heartRate;
+        if (is16BitFormat) {
+          heartRate = value.getUint16(1, true); // true for little-endian
+        } else {
+          heartRate = value.getUint8(1);
+        }
+        
+        if (isPlausibleHeartRate(heartRate)) {
+          onHeartRateUpdate(heartRate);
+        } else {
+          console.warn('Ignoring implausible BPM:', heartRate);
+        }
+      }
+    );
+    
+    return device.deviceId;
+  } catch (error) {
+    console.error("Bluetooth connection failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Disconnects from the connected Heart Rate Monitor.
+ * @param {string} deviceId The device ID to disconnect from.
+ */
+export async function disconnectHeartRateMonitor(deviceId) {
+  if (!deviceId) return;
+  try {
+    await BleClient.disconnect(deviceId);
+    console.log(`Disconnected from ${deviceId}`);
+  } catch (error) {
+    console.error("Failed to disconnect:", error);
+  }
+}
+
+```
+
+## Bestand: src/utils/firebase.js
+
+```javascript
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Cloud Firestore and get a reference to the service
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+
+```
+
+## Bestand: src/utils/i18n.js
+
+```javascript
+import { getProfile } from './storage.js';
+
+export const translations = {
+  nl: {
+    // Shared
+    'btn.back': '← Terug',
+    'btn.save': 'Opslaan',
+    'btn.cancel': 'Annuleren',
+    'btn.confirm': 'Bevestigen',
+    'btn.next': 'Volgende →',
+    'btn.quit': '✕ Stop',
+    'btn.skip': 'Overslaan',
+    'btn.start': '▶ Start',
+    'btn.pause': '⏸ Pauze',
+    'btn.finish': 'Afronden ✓',
+    'nav.home': 'Home',
+    'nav.coach': 'Coach',
+    'nav.community': 'Community',
+    'nav.settings': 'Instellingen',
+    
+    // Home
+    'home.greeting': 'Hoi',
+    'home.minPerDay': 'min per dag',
+    'home.daysPerWeek': 'dagen per week',
+    'home.avgLevel': 'Gem. Niveau',
+    'home.today': 'Vandaag',
+    'home.doneToday': 'Vandaag al voltooid — goed bezig! 💚',
+    'home.playAgain': '✓ Nogmaals oefenen',
+    'home.workouts': 'Workouts',
+    'home.weeks': 'Weken',
+    'home.intensity': 'Intensiteit',
+    'home.scienceBadge': 'Opbouw van de routine',
+    'home.quote': '♥ Jouw consistentie vandaag, is je resultaat morgen. ♥',
+    
+    // Calendar
+    'calendar.title': '📅 Schema',
+    'calendar.reset': 'Voortgang resetten',
+    'calendar.days': ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'],
+
+    // Onboarding
+    'ob.step.of': 'Stap {0} van {1}',
+    'ob.welcome.title': 'Welkom!',
+    'ob.welcome.sub': 'Laten we je Pilates routine instellen.',
+    'ob.name.label': 'Hoe mogen we je noemen?',
+    'ob.name.placeholder': 'Je naam...',
+    'ob.gender.title': 'Wat is je geslacht?',
+    'ob.gender.sub': 'Hier stemmen we de oefeningen op af.',
+    'ob.gender.f': 'Vrouw',
+    'ob.gender.m': 'Man',
+    'ob.gender.n': 'Liever niet zeggen',
+    'ob.goals.title': 'Waar wil je aan werken',
+    'ob.goals.sub': 'Kies één of meer focusgebieden.',
+    'ob.goals.legs': 'Billen & Benen',
+    'ob.goals.core': 'Core, Buik & Armen',
+    'ob.goals.back': 'Rug & Houding',
+    'ob.goals.all': 'Alles',
+    'ob.level.title': 'Wat is je startniveau?',
+    'ob.level.sub': 'We bouwen de intensiteit vanaf hier langzaam op.',
+    'ob.level.beg.title': 'Beginner (Makkelijk)',
+    'ob.level.beg.desc': 'Start rustig aan.',
+    'ob.level.int.title': 'Gemiddeld',
+    'ob.level.int.desc': 'Je hebt al wat ervaring.',
+    'ob.level.adv.title': 'Gevorderd',
+    'ob.level.adv.desc': 'Klaar voor een uitdaging!',
+    'ob.time.title': 'Tijd & frequentie',
+    'ob.time.sub': 'Hoeveel tijd per dag en hoe vaak per week?',
+    'ob.time.minLabel': 'Minuten per dag',
+    'ob.time.daysLabel': 'Dagen per week',
+    'ob.start.title': 'Wanneer begin je?',
+    'ob.start.sub': 'Het schema start op deze datum.',
+    'ob.btn.start': 'Starten! 🎉',
+
+    // Settings
+    'set.title': 'Instellingen',
+    'set.name': 'Naam',
+    'set.startDate': 'Startdatum Schema',
+    'set.lvl.core': 'Niveau Core, Buik & Armen',
+    'set.lvl.legs': 'Niveau Billen & Benen',
+    'set.lvl.back': 'Niveau Rug & Houding',
+    'set.gender': 'Geslacht',
+    'set.goals': 'Focusgebieden',
+    'set.stretch': 'Inclusief stretch',
+    'set.resetAll': 'Alles resetten & opnieuw beginnen',
+    'set.language': 'Taal',
+    'set.theme': 'Thema',
+    'set.theme.light': 'Licht',
+    'set.theme.dark': 'Donker',
+    'set.theme.auto': 'Automatisch',
+    
+    // Workout
+    'wk.nextSection': 'Volgende sectie',
+    'wk.hold': '🔒 Houd vast!',
+    'wk.ofReps': 'van {0} reps',
+    'wk.tapHint': 'Langzaam: ±4 sec. per rep',
+    'wk.tut.tooFast': 'Te snel! Behoud de spierspanning (Time Under Tension).',
+    'wk.seconds': 'seconden',
+    'wk.intro.encouragement1': 'Laten we beginnen, {0}! 🌿',
+    'wk.intro.encouragement2': 'Goed bezig, {0}! 💪',
+    'wk.intro.encouragement3': 'Klaar voor de volgende? 🔥',
+    'wk.intro.encouragement4': 'Je doet het geweldig! 🌟',
+    'wk.intro.btn': 'Laten we gaan →',
+
+    // Complete
+    'comp.title': 'Routine Voltooid!',
+    'comp.msg1': 'Geweldig gedaan, {0}! Je lichaam bedankt je. 💚',
+    'comp.msg2': 'Weer een workout erop! Elke dag een stapje sterker.',
+    'comp.msg3': 'Fantastisch! Consistentie is de sleutel. 🔑',
+    'comp.workoutsTotal': 'Workouts totaal',
+    'comp.currentWeek': 'Huidig',
+    'comp.btn.home': 'Terug naar Home',
+    'comp.btn.leaderboard': 'Bekijk Leaderboard 🏆',
+
+    // Community
+    'comm.title': 'Community 🏆',
+    'comm.logout': 'Log uit',
+    'comm.inviteCopy': '🔗 Invite Link Kopiëren',
+    'comm.inviteCopied': '✓ Gekopieerd!',
+    'comm.newGroup': '➕ Nieuwe Groep',
+    'comm.loading': 'Laden...',
+    'comm.empty': 'Nog niemand in deze groep.',
+    'comm.you': '(Jij)',
+    'comm.week': 'Week',
+    'comm.lastActive': 'Laatst actief:',
+    'comm.missed': 'gemist',
+
+    // Auth
+    'auth.title': 'Word lid van de Community',
+    'auth.sub1': 'Log in om je voortgang te vergelijken, samen met vrienden te trainen in privé groepen, en gemotiveerd te blijven.',
+    'auth.sub2': 'Log in om de uitnodiging voor groep <b>{0}</b> te accepteren!',
+    'auth.google': 'Ga verder met Google',
+    'auth.or': 'of',
+    'auth.email': 'E-mailadres',
+    'auth.pass': 'Wachtwoord',
+    'auth.loginBtn': 'Inloggen',
+    'auth.regBtn': 'Registreren',
+
+    // Dialogs
+    'dlg.quit.title': 'Routine stoppen?',
+    'dlg.quit.msg': 'Je voortgang voor deze workout gaat verloren.',
+    'dlg.quit.confirm': 'Doorgaan',
+    'dlg.quit.cancel': 'Stoppen',
+    'dlg.reset.title': 'Voortgang resetten?',
+    'dlg.reset.msg': 'Je workout-voortgang wordt gewist. Je profiel blijft behouden.',
+    'dlg.resetAll.title': 'Alles resetten (Lokaal & Cloud)?',
+    'dlg.resetAll.msg': 'Je lokale profiel én je opgeslagen cloud-voortgang worden hiermee volledig gewist.',
+    'dlg.science.title': '🧘 Principes van de Routine',
+    'dlg.science.msg': 'Deze routine maakt gebruik van een <b>rustig herhalingstempo</b> en <b>geleidelijke opbouw</b>.<br><br><b>Rustig tempo:</b> Door gecontroleerd te bewegen focus je op balans, houding en spierbeheersing.<br><b>Geleidelijke opbouw:</b> Het programma verhoogt in stappen de intensiteit om je spieren op een veilige manier uit te dagen.<br><br>Daarom is te snel doorklikken geblokkeerd.',
+
+    // Workout skip/fail
+    'wk.skipWarning': 'Let op: als je nog meer oefeningen overslaat, telt deze workout niet meer mee voor je voortgang.',
+    'wk.notCompleted.title': 'Niet voltooid',
+    'wk.notCompleted.msg': 'Je hebt meer dan de helft van de oefeningen overgeslagen. Deze workout telt helaas niet mee voor je voortgang.',
+
+    // Community prompts
+    'comm.createPrompt': 'Naam:',
+    'comm.createSuccess.title': 'Groep aangemaakt!',
+    'comm.createSuccess.msg': 'Deel de invite link met je vrienden.',
+    'comm.createError': 'Fout bij maken groep.',
+    'auth.fieldsRequired': 'Vul je e-mail en wachtwoord in.',
+
+    // Settings level labels
+    'set.lvl.0': 'Uit (Niet trainen)',
+    'set.lvl.1': 'Beginner (Makkelijk)',
+    'set.lvl.2': 'Beginner+',
+    'set.lvl.3': 'Licht Gemiddeld',
+    'set.lvl.4': 'Gemiddeld',
+    'set.lvl.5': 'Gemiddeld+',
+    'set.lvl.6': 'Gevorderd',
+    'set.lvl.7': 'Gevorderd+',
+    'set.lvl.8': 'Expert',
+
+    'side.been': 'been',
+    'side.kant': 'kant',
+  },
+  en: {
+    'side.been': 'leg',
+    'side.kant': 'side',
+    // Shared
+    'btn.back': '← Back',
+    'btn.save': 'Save',
+    'btn.cancel': 'Cancel',
+    'btn.confirm': 'Confirm',
+    'btn.next': 'Next →',
+    'btn.quit': '✕ Quit',
+    'btn.skip': 'Skip',
+    'btn.start': '▶ Start',
+    'btn.pause': '⏸ Pause',
+    'btn.finish': 'Finish ✓',
+    'nav.home': 'Home',
+    'nav.coach': 'Coach',
+    'nav.community': 'Community',
+    'nav.settings': 'Settings',
+
+    // Home
+    'home.greeting': 'Hi',
+    'home.minPerDay': 'min per day',
+    'home.daysPerWeek': 'days per week',
+    'home.avgLevel': 'Avg. Level',
+    'home.today': 'Today',
+    'home.doneToday': 'Already completed today — great job! 💚',
+    'home.playAgain': '✓ Practice Again',
+    'home.workouts': 'Workouts',
+    'home.weeks': 'Weeks',
+    'home.intensity': 'Intensity',
+    'home.scienceBadge': 'How the routine works',
+    'home.quote': '♥ Your consistency today is your result tomorrow. ♥',
+
+    // Calendar
+    'calendar.title': '📅 Schedule',
+    'calendar.reset': 'Reset Progress',
+    'calendar.days': ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+
+    // Onboarding
+    'ob.step.of': 'Step {0} of {1}',
+    'ob.welcome.title': 'Welcome!',
+    'ob.welcome.sub': "Let's set up your Pilates routine.",
+    'ob.name.label': 'What should we call you?',
+    'ob.name.placeholder': 'Your name...',
+    'ob.gender.title': 'What is your gender?',
+    'ob.gender.sub': 'We tailor the exercises based on this.',
+    'ob.gender.f': 'Female',
+    'ob.gender.m': 'Male',
+    'ob.gender.n': 'Prefer not to say',
+    'ob.goals.title': 'What do you want to work on',
+    'ob.goals.sub': 'Choose one or more focus areas.',
+    'ob.goals.legs': 'Glutes & Legs',
+    'ob.goals.core': 'Core, Abs & Arms',
+    'ob.goals.back': 'Back & Posture',
+    'ob.goals.all': 'Everything',
+    'ob.level.title': 'What is your starting level?',
+    'ob.level.sub': 'We will slowly build up the intensity from here.',
+    'ob.level.beg.title': 'Beginner (Easy)',
+    'ob.level.beg.desc': 'Start off slowly.',
+    'ob.level.int.title': 'Intermediate',
+    'ob.level.int.desc': 'You have some experience.',
+    'ob.level.adv.title': 'Advanced',
+    'ob.level.adv.desc': 'Ready for a challenge!',
+    'ob.time.title': 'Time & Frequency',
+    'ob.time.sub': 'How much time per day and how often per week?',
+    'ob.time.minLabel': 'Minutes per day',
+    'ob.time.daysLabel': 'Days per week',
+    'ob.start.title': 'When are you starting?',
+    'ob.start.sub': 'The routine will start on this date.',
+    'ob.btn.start': 'Start! 🎉',
+
+    // Settings
+    'set.title': 'Settings',
+    'set.name': 'Name',
+    'set.startDate': 'Routine Start Date',
+    'set.lvl.core': 'Level Core, Abs & Arms',
+    'set.lvl.legs': 'Level Glutes & Legs',
+    'set.lvl.back': 'Level Back & Posture',
+    'set.gender': 'Gender',
+    'set.goals': 'Focus Areas',
+    'set.stretch': 'Include stretch',
+    'set.resetAll': 'Reset Everything & Start Over',
+    'set.language': 'Language',
+    'set.theme': 'Theme',
+    'set.theme.light': 'Light',
+    'set.theme.dark': 'Dark',
+    'set.theme.auto': 'Auto',
+
+    // Workout
+    'wk.nextSection': 'Next section',
+    'wk.hold': '🔒 Hold it!',
+    'wk.ofReps': 'of {0} reps',
+    'wk.tapHint': 'Slow: ±4 sec. per rep',
+    'wk.tut.tooFast': 'Too fast! Maintain Time Under Tension (TUT).',
+    'wk.seconds': 'seconds',
+    'wk.intro.encouragement1': "Let's begin, {0}! 🌿",
+    'wk.intro.encouragement2': 'Great job, {0}! 💪',
+    'wk.intro.encouragement3': 'Ready for the next one? 🔥',
+    'wk.intro.encouragement4': "You're doing amazing! 🌟",
+    'wk.intro.btn': "Let's go →",
+
+    // Complete
+    'comp.title': 'Routine Completed!',
+    'comp.msg1': 'Amazing job, {0}! Your body thanks you. 💚',
+    'comp.msg2': 'Another workout in the bag! A little stronger every day.',
+    'comp.msg3': 'Fantastic! Consistency is key. 🔑',
+    'comp.workoutsTotal': 'Total Workouts',
+    'comp.currentWeek': 'Current',
+    'comp.btn.home': 'Back to Home',
+    'comp.btn.leaderboard': 'View Leaderboard 🏆',
+
+    // Community
+    'comm.title': 'Community 🏆',
+    'comm.logout': 'Logout',
+    'comm.inviteCopy': '🔗 Copy Invite Link',
+    'comm.inviteCopied': '✓ Copied!',
+    'comm.newGroup': '➕ New Group',
+    'comm.loading': 'Loading...',
+    'comm.empty': 'No one in this group yet.',
+    'comm.you': '(You)',
+    'comm.week': 'Week',
+    'comm.lastActive': 'Last active:',
+    'comm.missed': 'missed',
+
+    // Auth
+    'auth.title': 'Join the Community',
+    'auth.sub1': 'Log in to compare your progress, work out with friends in private groups, and stay motivated.',
+    'auth.sub2': 'Log in to accept the invite for group <b>{0}</b>!',
+    'auth.google': 'Continue with Google',
+    'auth.or': 'or',
+    'auth.email': 'Email Address',
+    'auth.pass': 'Password',
+    'auth.loginBtn': 'Login',
+    'auth.regBtn': 'Register',
+
+    // Dialogs
+    'dlg.quit.title': 'Quit routine?',
+    'dlg.quit.msg': 'Your progress for this workout will be lost.',
+    'dlg.quit.confirm': 'Continue Workout',
+    'dlg.quit.cancel': 'Quit', 
+    'dlg.reset.title': 'Reset progress?',
+    'dlg.reset.msg': 'Your workout progress will be cleared. Your profile is kept.',
+    'dlg.resetAll.title': 'Reset everything?',
+    'dlg.resetAll.msg': 'Your profile and progress will be cleared.',
+    'dlg.science.title': '🧘 Routine Principles',
+    'dlg.science.msg': 'This routine utilizes a <b>controlled rep tempo</b> and <b>gradual progression</b>.<br><br><b>Controlled Tempo:</b> Moving with control helps focus on balance, posture, and muscle engagement.<br><b>Gradual Progression:</b> The program steps up intensity gradually to challenge your muscles safely.<br><br>Fast clicking is paused to encourage mindful execution.',
+
+    // Workout skip/fail
+    'wk.skipWarning': 'Warning: if you skip more exercises, this workout will no longer count towards your progress.',
+    'wk.notCompleted.title': 'Not Completed',
+    'wk.notCompleted.msg': 'You skipped more than half of the exercises. This workout does not count towards your progress.',
+
+    // Community prompts
+    'comm.createPrompt': 'Name:',
+    'comm.createSuccess.title': 'Group created!',
+    'comm.createSuccess.msg': 'Share the invite link with your friends.',
+    'comm.createError': 'Error creating group.',
+    'auth.fieldsRequired': 'Please enter your email and password.',
+
+    // Settings level labels
+    'set.lvl.0': 'Off (Do not train)',
+    'set.lvl.1': 'Beginner (Easy)',
+    'set.lvl.2': 'Beginner+',
+    'set.lvl.3': 'Light Intermediate',
+    'set.lvl.4': 'Intermediate',
+    'set.lvl.5': 'Intermediate+',
+    'set.lvl.6': 'Advanced',
+    'set.lvl.7': 'Advanced+',
+    'set.lvl.8': 'Expert',
+  }
+};
+
+export function getLanguage() {
+  const profile = getProfile();
+  return profile?.language || 'nl';
+}
+
+export function t(key, ...args) {
+  const lang = getLanguage();
+  let text = translations[lang][key] || translations['nl'][key] || key;
+  
+  if (args && args.length > 0) {
+    args.forEach((arg, i) => {
+      text = text.replace(`{${i}}`, arg);
+    });
+  }
+  return text;
+}
+
+```
+
+## Bestand: src/utils/scheduler.js
+
+```javascript
+/**
+ * Scheduler — determines which sections to train today
+ * based on user goals and day rotation.
+ */
+
+import { SECTIONS } from '../data/exercises.js';
+import { getProfile, getProgramStartDate, formatDate, getTotalCompleted } from './storage.js';
+
+/**
+ * Goal ID to section mapping.
+ */
+const GOAL_SECTIONS = {
+  'billen-benen': ['benen-billen'],
+  'core': ['core'],
+  'rug': ['rug-houding'],
+  'alles': ['benen-billen', 'core', 'rug-houding'],
+};
+
+/**
+ * Goal ID to display info.
+ */
+export const GOAL_INFO = {
+  'billen-benen': { emoji: '🦵', label: 'Billen & Benen', color: '#D4A0A0' },
+  'core': { emoji: '🧱', label: 'Core, Buik & Armen', color: '#C4A882' },
+  'rug': { emoji: '🧘', label: 'Rug & Houding', color: '#B8A9C9' },
+  'alles': { emoji: '⭐', label: 'Alles', color: '#A8C09A' },
+};
+
+function getActiveGoals(profile) {
+  if (!profile) return ['alles'];
+
+  if (Array.isArray(profile.goals) && profile.goals.includes('alles')) {
+    return ['alles'];
+  }
+
+  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
+  const userGoals = Array.isArray(profile.goals) && profile.goals.length > 0 ? profile.goals : ['billen-benen', 'core', 'rug'];
+
+  const activeGoals = [];
+  if (userGoals.includes('core') && baseLevels.core !== 0) activeGoals.push('core');
+  if ((userGoals.includes('billen-benen') || userGoals.includes('benen-billen')) && baseLevels['benen-billen'] !== 0) activeGoals.push('billen-benen');
+  if (userGoals.includes('rug') && baseLevels['rug-houding'] !== 0) activeGoals.push('rug');
+
+  if (activeGoals.length === 3 || activeGoals.length === 0) return ['alles'];
+  return activeGoals;
+}
+
+/**
+ * Get the sections to train today based on user profile.
+ */
+export function getTodaysFocus() {
+  const profile = getProfile();
+  if (!profile) {
+    return {
+      sectionIds: ['warmup', 'benen-billen', 'core', 'rug-houding', 'stretch'],
+      focusLabel: 'Volledige Routine',
+      focusEmoji: '⭐',
+    };
+  }
+
+  const baseLevels = profile.baseLevels || { core: 1, 'benen-billen': 1, 'rug-houding': 1 };
+  const goals = getActiveGoals(profile);
+
+  if (goals.includes('alles')) {
+    const sectionIds = ['warmup'];
+    if (baseLevels.core > 0) sectionIds.push('core');
+    if (baseLevels['benen-billen'] > 0) sectionIds.push('benen-billen');
+    if (baseLevels['rug-houding'] > 0) sectionIds.push('rug-houding');
+    
+    const hasActiveSections = sectionIds.length > 1;
+    if (profile.includeStretch !== false) sectionIds.push('stretch');
+    
+    return {
+      sectionIds,
+      focusLabel: hasActiveSections ? 'Volledige Routine' : 'Herstel & Stretch',
+      focusEmoji: hasActiveSections ? '⭐' : '🧘',
+    };
+  }
+
+  if (goals.length === 1) {
+    const goal = goals[0];
+    const info = GOAL_INFO[goal];
+    const mainSections = GOAL_SECTIONS[goal] || [];
+    const sectionIds = ['warmup', ...mainSections];
+    if (profile.includeStretch !== false) sectionIds.push('stretch');
+    return {
+      sectionIds,
+      focusLabel: info.label,
+      focusEmoji: info.emoji,
+    };
+  }
+
+  const dayIndex = getWorkoutDayIndex();
+  const goalIndex = dayIndex % goals.length;
+  const todayGoal = goals[goalIndex];
+  const info = GOAL_INFO[todayGoal];
+  const mainSections = GOAL_SECTIONS[todayGoal] || [];
+  const sectionIds = ['warmup', ...mainSections];
+  if (profile.includeStretch !== false) sectionIds.push('stretch');
+
+  return {
+    sectionIds,
+    focusLabel: info.label,
+    focusEmoji: info.emoji,
+  };
+}
+
+export function getFocusForDate(dateStr) {
+  const profile = getProfile();
+  if (!profile) return GOAL_INFO['alles'];
+
+  const goals = getActiveGoals(profile);
+
+  if (goals.includes('alles') || goals.length === 1) {
+    const goal = goals.includes('alles') ? 'alles' : goals[0];
+    return GOAL_INFO[goal];
+  }
+
+  const startDate = getProgramStartDate();
+  if (!startDate) return GOAL_INFO['alles'];
+
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.floor((target - start) / (1000 * 60 * 60 * 24));
+  const goalIndex = ((diffDays % goals.length) + goals.length) % goals.length;
+
+  return GOAL_INFO[goals[goalIndex]];
+}
+
+export function getGoalSubtitle() {
+  const profile = getProfile();
+  if (!profile) return 'Strakke benen & strakke buik';
+
+  const goals = getActiveGoals(profile);
+
+  if (goals.includes('alles')) {
+    return 'Strakke benen, sterke core & gezonde rug';
+  }
+
+  const parts = goals.map(g => {
+    switch (g) {
+      case 'billen-benen': return 'strakke billen & benen';
+      case 'core': return 'sterke core & buik';
+      case 'rug': return 'gezonde rug & houding';
+      default: return '';
+    }
+  }).filter(Boolean);
+
+  return parts.join(' & ').replace(/^./, c => c.toUpperCase());
+}
+
+function getWorkoutDayIndex() {
+  return getTotalCompleted();
+}
+
+```
+
+## Bestand: src/utils/social.js
+
+```javascript
+import { db } from './firebase.js';
+import { getCurrentUser } from './auth.js';
+import { 
+  doc, setDoc, getDoc, getDocs, deleteDoc, writeBatch,
+  collection, arrayUnion, serverTimestamp 
+} from 'firebase/firestore';
+
+/**
+ * Initialize or update user document in Firestore on login.
+ */
+export async function initializeSocialUser(localProfile, localTotal = 0, localWeek = 1, localMissed = 0) {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+
+    let communities = ['global'];
+
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        name: localProfile.name || user.displayName || 'Pilates Fan',
+        totalWorkouts: localTotal || 0,
+        currentWeek: localWeek || 1,
+        missedWorkouts: localMissed || 0,
+        communities: communities,
+        lastActive: serverTimestamp()
+      });
+    } else {
+      const data = userSnap.data();
+      communities = data.communities || ['global'];
+      await setDoc(userRef, {
+        name: localProfile.name || data.name || user.displayName || 'Pilates Fan',
+        totalWorkouts: Math.max(localTotal, data.totalWorkouts || 0),
+        currentWeek: Math.max(localWeek, data.currentWeek || 1),
+        missedWorkouts: localMissed || data.missedWorkouts || 0,
+        communities: communities,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+    }
+
+    return communities;
+  } catch (error) {
+    console.error("Error initializing social user:", error);
+  }
+}
+
+/**
+ * Push the current user's progress to Firestore atomically across user and community member documents.
+ */
+export async function pushUserProgress(data) {
+  const user = getCurrentUser();
+  if (!user) return; // Only push if authenticated
+
+  try {
+    const displayName = data.name && data.name.trim() !== '' ? sanitizeText(data.name, 40) : 'Pilates Fan';
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    batch.set(userRef, {
+      name: displayName,
+      totalWorkouts: data.totalWorkouts || 0,
+      currentWeek: data.currentWeek || 1,
+      missedWorkouts: data.missedWorkouts || 0,
+      lastActive: serverTimestamp()
+    }, { merge: true });
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      batch.set(memberRef, {
+        displayName: displayName,
+        score: data.totalWorkouts || 0,
+        currentWeek: data.currentWeek || 1,
+        lastActive: serverTimestamp()
+      }, { merge: true });
+    }
+
+    await batch.commit();
+  } catch (error) {
+    console.error("Error pushing progress in batch:", error);
+    throw error;
+  }
+}
+
+/**
+ * Reset cloud progress for authenticated user, deleting user document and all community member entries atomically.
+ */
+export async function resetCloudProgress() {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+    const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
+
+    const batch = writeBatch(db);
+
+    for (const commCode of communities) {
+      const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
+      batch.delete(memberRef);
+    }
+
+    batch.delete(userRef);
+    await batch.commit();
+  } catch (error) {
+    console.warn("Could not delete cloud user documents:", error);
+  }
+}
+
+/**
+ * Fetch the leaderboard for a specific community.
+ */
+export async function getLeaderboard(communityCode = 'global') {
+  try {
+    const membersRef = collection(db, 'communities', communityCode, 'members');
+    const querySnapshot = await getDocs(membersRef);
+    
+    const leaderboard = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      let lastActiveStr = 'Onbekend';
+      if (data.lastActive && data.lastActive.toDate) {
+        lastActiveStr = data.lastActive.toDate().toLocaleDateString();
+      } else if (data.lastActive) {
+        lastActiveStr = new Date(data.lastActive).toLocaleDateString();
+      }
+
+      leaderboard.push({
+        id: doc.id,
+        name: data.displayName || 'Pilates Fan',
+        totalWorkouts: data.score || 0,
+        missedWorkouts: 0,
+        currentWeek: data.currentWeek || 1,
+        lastActive: lastActiveStr
+      });
+    });
+    
+    leaderboard.sort((a, b) => b.totalWorkouts - a.totalWorkouts);
+    return leaderboard;
+  } catch (error) {
+    console.error("Error fetching leaderboard:", error);
+    return [];
+  }
+}
+
+/**
+ * Create a new community
+ */
+function sanitizeText(str, maxLen = 40) {
+  if (!str || typeof str !== 'string') return '';
+  return str.replace(/<[^>]*>/g, '').trim().substring(0, maxLen);
+}
+
+export async function createCommunity(name) {
+  try {
+    const user = getCurrentUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const cleanName = sanitizeText(name, 40);
+    if (!cleanName) throw new Error("Ongeldige groepsnaam.");
+
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const commRef = doc(db, 'communities', code);
+    await setDoc(commRef, {
+      id: code,
+      name: cleanName,
+      ownerId: user.uid,
+      createdAt: serverTimestamp()
+    });
+
+    // Add owner to this community
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      communities: arrayUnion(code)
+    }, { merge: true });
+
+    return code;
+  } catch (error) {
+    console.error("Error creating community:", error);
+    import('../ui/core.js').then(module => module.showToast('Fout bij maken groep.', 'error'));
+    throw error;
+  }
+}
+
+/**
+ * Join an existing community by code
+ */
+export async function joinCommunity(code) {
+  try {
+    const user = getCurrentUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const formattedCode = code.trim().toUpperCase();
+
+    // Optionally verify if community exists
+    const commRef = doc(db, 'communities', formattedCode);
+    const commSnap = await getDoc(commRef);
+    
+    if (!commSnap.exists() && formattedCode !== 'GLOBAL') {
+      throw new Error("Community niet gevonden!");
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
+      communities: arrayUnion(formattedCode)
+    }, { merge: true });
+
+    return formattedCode;
+  } catch (error) {
+    console.error("Error joining community:", error);
+    import('../ui/core.js').then(module => module.showToast(error.message || 'Fout bij joinen groep.', 'error'));
+    throw error;
+  }
+}
+
+/**
+ * Get user's communities details
+ */
+export async function getUserCommunities() {
+  try {
+    const user = getCurrentUser();
+    if (!user) return [];
+
+    const userRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) return [{ id: 'global', name: 'Global' }];
+
+    const data = userSnap.data();
+    const codes = data.communities || ['global'];
+
+    const results = [];
+    for (const code of codes) {
+      if (code === 'global' || code === 'GLOBAL') {
+        results.push({ id: 'global', name: 'Global Community' });
+      } else {
+        const commRef = doc(db, 'communities', code);
+        const commSnap = await getDoc(commRef);
+        if (commSnap.exists()) {
+          results.push({ id: code, name: commSnap.data().name });
+        } else {
+          results.push({ id: code, name: `Groep ${code}` }); // Fallback
+        }
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error("Error getting user communities:", error);
+    import('../ui/core.js').then(module => module.showToast('Kan groepen niet laden.', 'error'));
+    return [{ id: 'global', name: 'Global' }];
+  }
+}
+
+```
+
+## Bestand: src/utils/storage.js
+
+```javascript
+/**
+ * LocalStorage utilities for user profile and 8-week progress tracking.
+ *
+ * Stores:
+ * - User profile: name, goals, daily minutes, days per week
+ * - Program: start date, completed days (with focus type)
+ */
+
+const STORAGE_KEYS = {
+  PROFILE: 'pilates_user_profile',
+  COMPLETED_DAYS: 'pilates_completed_days',
+};
+
+// ═══════════════════════════════════════
+// USER PROFILE
+// ═══════════════════════════════════════
+
+/**
+ * Default profile shape.
+ */
+const DEFAULT_PROFILE = {
+  name: '',
+  goals: ['alles'],       // ['billen-benen', 'core', 'rug', 'alles']
+  dailyMinutes: 15,       // 10, 15, 20
+  daysPerWeek: 6,         // 3, 4, 5, 6
+  startDate: null,        // ISO date string
+  baseLevels: {
+    'core': 0,
+    'benen-billen': 0,
+    'rug-houding': 0
+  },
+  includeStretch: true,
+  onboardingComplete: false,
+  schemaVersion: 1,
+};
+
+export function parseLocalISODate(dateString) {
+  if (!dateString || typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return null;
+  }
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function clampInteger(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+export function normalizeProfile(input = {}) {
+  return {
+    ...DEFAULT_PROFILE,
+    name: typeof input.name === 'string' ? input.name.trim().slice(0, 50) : '',
+    goals: Array.isArray(input.goals) 
+      ? input.goals.filter(g => ['alles', 'core', 'rug', 'benen-billen'].includes(g)) 
+      : ['alles'],
+    dailyMinutes: [10, 15, 20].includes(Number(input.dailyMinutes)) ? Number(input.dailyMinutes) : 15,
+    daysPerWeek: clampInteger(input.daysPerWeek, 1, 7, 6),
+    theme: ['auto', 'light', 'dark'].includes(input.theme) ? input.theme : 'auto',
+    language: ['nl', 'en'].includes(input.language) ? input.language : 'nl',
+    startDate: parseLocalISODate(input.startDate) ? input.startDate : formatDate(new Date()),
+    baseLevels: {
+      'core': clampInteger(input.baseLevels?.['core'], 0, 8, 1),
+      'benen-billen': clampInteger(input.baseLevels?.['benen-billen'], 0, 8, 1),
+      'rug-houding': clampInteger(input.baseLevels?.['rug-houding'], 0, 8, 1),
+    },
+    includeStretch: input.includeStretch !== false,
+    onboardingComplete: input.onboardingComplete === true,
+    schemaVersion: 2
+  };
+}
+
+/**
+ * Get the user profile. Returns null if onboarding not complete.
+ */
+export function getProfile() {
+  const stored = localStorage.getItem(STORAGE_KEYS.PROFILE);
+  if (stored) {
+    let parsed;
+    try {
+      parsed = JSON.parse(stored);
+    } catch (e) {
+      console.error('Failed to parse profile', e);
+      return null;
+    }
+    return normalizeProfile(parsed);
+  }
+  return null;
+}
+
+/**
+ * Save the user profile.
+ */
+export function saveProfile(profile) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+  } catch (e) {
+    console.error('Failed to save profile to localStorage', e);
+  }
+}
+
+/**
+ * Check if onboarding is complete.
+ */
+export function isOnboardingComplete() {
+  const profile = getProfile();
+  return profile && profile.onboardingComplete;
+}
+
+/**
+ * Get the user's name.
+ */
+export function getUserName() {
+  const profile = getProfile();
+  return profile ? profile.name : '';
+}
+
+/**
+ * Get the program start date as a Date object.
+ */
+export function getProgramStartDate() {
+  const profile = getProfile();
+  if (profile && profile.startDate) {
+    const parts = profile.startDate.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        return new Date(year, month - 1, day);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Update the start date.
+ */
+export function setStartDate(dateStr) {
+  const profile = getProfile();
+  if (profile) {
+    profile.startDate = dateStr;
+    saveProfile(profile);
+  }
+}
+
+// ═══════════════════════════════════════
+// COMPLETED DAYS
+// ═══════════════════════════════════════
+
+/**
+ * Get all completed days as a Map of "YYYY-MM-DD" → focus type emoji.
+ */
+export function getCompletedDays() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.COMPLETED_DAYS);
+    if (stored) {
+      let parsed;
+      try {
+        parsed = JSON.parse(stored);
+      } catch (e) {
+        console.error('Failed to parse completed days', e);
+        return {};
+      }
+      if (Array.isArray(parsed)) {
+        const map = {};
+        parsed.forEach(d => { map[d] = '✓'; });
+        return map;
+      }
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    }
+  } catch (e) {
+    console.error('Error reading completed days from localStorage', e);
+  }
+  return {};
+}
+
+/**
+ * Mark today as completed with the given focus type.
+ */
+export function markTodayComplete(focusEmoji = '✓') {
+  try {
+    const days = getCompletedDays();
+    const today = formatDate(new Date());
+    days[today] = focusEmoji;
+    localStorage.setItem(STORAGE_KEYS.COMPLETED_DAYS, JSON.stringify(days));
+  } catch (e) {
+    console.error('Failed to save completed day to localStorage', e);
+  }
+}
+
+/**
+ * Check if today is already completed.
+ */
+export function isTodayComplete() {
+  const days = getCompletedDays();
+  return formatDate(new Date()) in days;
+}
+
+/**
+ * Get current week number (1-8) based on start date.
+ * Returns 1 if program hasn't started or if before week 1.
+ */
+export function getCurrentWeek() {
+  const startDate = getProgramStartDate();
+  if (!startDate) return 1;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+
+  const diffMs = today - start;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const week = Math.floor(diffDays / 7) + 1;
+
+  return Math.min(Math.max(week, 1), 8);
+}
+
+/**
+ * Get the total number of completed workouts.
+ */
+export function getTotalCompleted() {
+  return Object.keys(getCompletedDays()).length;
+}
+
+/**
+ * Calculate how many workouts the user has missed based on start date, daysPerWeek, and completed workouts.
+ */
+export function getMissedWorkouts() {
+  const profile = getProfile();
+  const start = getProgramStartDate();
+  if (!profile || !start) return 0;
+
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const daysPassed = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+  if (daysPassed <= 0) return 0; // Started today or in the future
+
+  const weeksPassed = Math.floor(daysPassed / 7);
+  const remainingDays = daysPassed % 7;
+  
+  // Total workouts they should have done up to yesterday
+  const expectedWorkouts = (weeksPassed * profile.daysPerWeek) + Math.min(remainingDays, profile.daysPerWeek);
+  
+  const totalCompleted = getTotalCompleted();
+  
+  return Math.max(0, expectedWorkouts - totalCompleted);
+}
+
+/**
+ * Build the 8-week calendar data using actual dates from start date.
+ * Each cell contains real dates, completion status, and focus icons.
+ */
+export function buildCalendarData() {
+  const startDate = getProgramStartDate();
+  const completedDays = getCompletedDays();
+  const currentWeek = getCurrentWeek();
+  const todayStr = formatDate(new Date());
+
+  const weeks = [];
+  const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+
+  for (let w = 0; w < 8; w++) {
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+      if (startDate) {
+        const date = new Date(startDate);
+        date.setHours(0, 0, 0, 0);
+        date.setDate(date.getDate() + w * 7 + d);
+        const dateStr = formatDate(date);
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        days.push({
+          date: dateStr,
+          dayNumber: date.getDate(),
+          monthLabel: MONTHS[date.getMonth()],
+          dayOfWeek: d,
+          isCompleted: dateStr in completedDays,
+          completedIcon: completedDays[dateStr] || null,
+          isToday: dateStr === todayStr,
+          isPast: date < now,
+          isFuture: date > now,
+        });
+      } else {
+        days.push({
+          date: null,
+          dayNumber: null,
+          monthLabel: null,
+          dayOfWeek: d,
+          isCompleted: false,
+          completedIcon: null,
+          isToday: false,
+          isPast: false,
+          isFuture: true,
+        });
+      }
+    }
+
+    // Determine week date range label
+    let weekLabel = `Week ${w + 1}`;
+    if (startDate && days[0].date && days[6].date) {
+      const first = days[0];
+      const last = days[6];
+      if (first.monthLabel === last.monthLabel) {
+        weekLabel = `${first.dayNumber}–${last.dayNumber} ${first.monthLabel}`;
+      } else {
+        weekLabel = `${first.dayNumber} ${first.monthLabel}–${last.dayNumber} ${last.monthLabel}`;
+      }
+    }
+
+    weeks.push({
+      weekNumber: w + 1,
+      isCurrent: currentWeek === w + 1,
+      weekLabel,
+      days,
+    });
+  }
+
+  return weeks;
+}
+
+/**
+ * Reset all progress data (keeps profile).
+ */
+export function resetProgress() {
+  localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
+  const profile = getProfile();
+  if (profile) {
+    profile.startDate = new Date().toISOString().split('T')[0];
+    saveProfile(profile);
+  }
+}
+
+/**
+ * Reset everything including profile (full reset of local and cloud progress).
+ */
+export async function resetAll() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.PROFILE);
+    localStorage.removeItem(STORAGE_KEYS.COMPLETED_DAYS);
+    localStorage.removeItem('pilates_pending_invite');
+    const { resetCloudProgress } = await import('./social.js');
+    await resetCloudProgress();
+  } catch (e) {
+    console.error('Error during resetAll:', e);
+  }
+}
+
+/**
+ * Format a Date to "YYYY-MM-DD" string.
+ */
+export function formatDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+```
 
 ## Bestand: tests/storage.test.js
-`javascript
+
+```javascript
 import { describe, it, expect } from 'vitest';
 import { getWeekProgression, applyProgression, buildWorkoutSteps } from '../src/data/exercises.js';
 
@@ -7309,5 +7399,4 @@ describe('Exercise Progression & Workout Steps Logic', () => {
   });
 });
 
-`
-
+```
