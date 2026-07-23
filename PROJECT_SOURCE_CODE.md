@@ -48,9 +48,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function validUserData() {
-      return (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50))
+      return request.resource.data.keys().hasOnly(['name', 'totalWorkouts', 'currentWeek', 'missedWorkouts', 'communities', 'lastActive'])
+      && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50))
       && (!('totalWorkouts' in request.resource.data) || (request.resource.data.totalWorkouts is int && request.resource.data.totalWorkouts >= 0))
-      && (!('currentWeek' in request.resource.data) || (request.resource.data.currentWeek is int && request.resource.data.currentWeek >= 1 && request.resource.data.currentWeek <= 8));
+      && (!('missedWorkouts' in request.resource.data) || (request.resource.data.missedWorkouts is int && request.resource.data.missedWorkouts >= 0))
+      && (!('currentWeek' in request.resource.data) || (request.resource.data.currentWeek is int && request.resource.data.currentWeek >= 1 && request.resource.data.currentWeek <= 8))
+      && (!('communities' in request.resource.data) || (request.resource.data.communities is list && request.resource.data.communities.size() <= 20));
     }
 
     match /users/{userId} {
@@ -76,16 +79,38 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 50;
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow update: if request.auth != null 
+                    && resource.data.ownerId == request.auth.uid
+                    && request.resource.data.ownerId == resource.data.ownerId
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 50;
+      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
 
       match /members/{memberUid} {
         allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == memberUid;
+        allow create: if request.auth != null 
+                      && request.auth.uid == memberUid
+                      && request.resource.data.keys().hasOnly(['displayName', 'score', 'currentWeek', 'lastActive'])
+                      && request.resource.data.score is int
+                      && request.resource.data.score >= 0
+                      && request.resource.data.score <= 500
+                      && request.resource.data.currentWeek is int
+                      && request.resource.data.currentWeek >= 1
+                      && request.resource.data.currentWeek <= 8
+                      && request.resource.data.displayName is string
+                      && request.resource.data.displayName.size() <= 50;
         allow update: if request.auth != null 
                       && request.auth.uid == memberUid
+                      && request.resource.data.keys().hasOnly(['displayName', 'score', 'currentWeek', 'lastActive'])
                       && request.resource.data.score is int
                       && request.resource.data.score >= resource.data.score
-                      && request.resource.data.score <= resource.data.score + 1;
+                      && request.resource.data.score <= resource.data.score + 1
+                      && request.resource.data.currentWeek is int
+                      && request.resource.data.currentWeek >= 1
+                      && request.resource.data.currentWeek <= 8
+                      && request.resource.data.displayName is string
+                      && request.resource.data.displayName.size() <= 50;
         allow delete: if request.auth != null && request.auth.uid == memberUid;
       }
     }
@@ -3285,12 +3310,12 @@ export function buildWorkoutSteps(sectionIds, currentWeek, baseLevels = {}) {
   const steps = [];
 
   const filteredExercises = EXERCISES.filter(e => {
-    return sectionIds.includes(e.sectionId);
+    const lvl = baseLevels[e.sectionId] ?? baseLevels['core'] ?? 1;
+    return sectionIds.includes(e.sectionId) && lvl > 0;
   });
 
   for (const exercise of filteredExercises) {
-    // Use the specific baseLevel for this exercise's section, default to 1 (or core if not found)
-    const sectionLevel = baseLevels[exercise.sectionId] || baseLevels['core'] || 1;
+    const sectionLevel = baseLevels[exercise.sectionId] ?? baseLevels['core'] ?? 1;
     const progressed = applyProgression(exercise, currentWeek, sectionLevel);
 
     if (progressed.perSide) {
@@ -3945,7 +3970,6 @@ export function renderCoach() {
       }
     });
   });
-}
 
   // Send Message Logic
   const sendBtn = document.getElementById('coach-send');
@@ -4036,12 +4060,8 @@ export function renderCoach() {
       const indicator = document.getElementById('coach-typing-indicator');
       if (indicator) indicator.remove();
 
-      console.error(e);
-      await addDoc(chatRef, {
-        role: 'model',
-        text: `Fout (${getAIProvider() === 'local' ? 'Lokaal Model' : 'Gemini Cloud'}): ${e.message}`,
-        createdAt: serverTimestamp()
-      });
+      console.error("AI error:", e);
+      showToast(getAIProvider() === 'local' ? 'Lokaal model kon geen antwoord genereren.' : 'Gemini Cloud verbinding mislukt.', 'error');
     }
   };
 
@@ -4049,6 +4069,7 @@ export function renderCoach() {
   if (input) input.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
   });
+}
 }
 
 function getModelName(id) {
@@ -4986,7 +5007,7 @@ export function renderWorkout() {
   const currentWeek = getCurrentWeek();
   
   const profile = getProfile();
-  const baseLevel = profile?.baseLevels?.[section.id] || 1;
+  const baseLevel = profile?.baseLevels?.[section.id] ?? 1;
   const weekProg = getWeekProgression(currentWeek, baseLevel);
   const lang = getLanguage();
 
@@ -5242,6 +5263,14 @@ export function startWorkout() {
   state.screen = 'workout';
   state.todayFocus = focus;
   state.workoutSteps = buildWorkoutSteps(focus.sectionIds, currentWeek, baseLevels);
+  
+  if (!state.workoutSteps || state.workoutSteps.length === 0) {
+    showToast('Geen oefeningen beschikbaar voor de gekozen instellingen.', 'error');
+    state.screen = 'settings';
+    render();
+    return;
+  }
+
   state.currentStepIndex = 0;
   state.exerciseComplete = false;
   state.showingSectionIntro = true;

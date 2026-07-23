@@ -17,7 +17,7 @@ export function renderWorkout() {
   const currentWeek = getCurrentWeek();
   
   const profile = getProfile();
-  const baseLevel = profile?.baseLevels?.[section.id] || 1;
+  const baseLevel = profile?.baseLevels?.[section.id] ?? 1;
   const weekProg = getWeekProgression(currentWeek, baseLevel);
   const lang = getLanguage();
 
@@ -273,6 +273,14 @@ export function startWorkout() {
   state.screen = 'workout';
   state.todayFocus = focus;
   state.workoutSteps = buildWorkoutSteps(focus.sectionIds, currentWeek, baseLevels);
+  
+  if (!state.workoutSteps || state.workoutSteps.length === 0) {
+    showToast('Geen oefeningen beschikbaar voor de gekozen instellingen.', 'error');
+    state.screen = 'settings';
+    render();
+    return;
+  }
+
   state.currentStepIndex = 0;
   state.exerciseComplete = false;
   state.showingSectionIntro = true;

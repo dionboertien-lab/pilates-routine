@@ -363,7 +363,6 @@ export function renderCoach() {
       }
     });
   });
-}
 
   // Send Message Logic
   const sendBtn = document.getElementById('coach-send');
@@ -454,12 +453,8 @@ export function renderCoach() {
       const indicator = document.getElementById('coach-typing-indicator');
       if (indicator) indicator.remove();
 
-      console.error(e);
-      await addDoc(chatRef, {
-        role: 'model',
-        text: `Fout (${getAIProvider() === 'local' ? 'Lokaal Model' : 'Gemini Cloud'}): ${e.message}`,
-        createdAt: serverTimestamp()
-      });
+      console.error("AI error:", e);
+      showToast(getAIProvider() === 'local' ? 'Lokaal model kon geen antwoord genereren.' : 'Gemini Cloud verbinding mislukt.', 'error');
     }
   };
 
@@ -467,6 +462,7 @@ export function renderCoach() {
   if (input) input.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
   });
+}
 }
 
 function getModelName(id) {

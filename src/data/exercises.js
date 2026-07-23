@@ -430,12 +430,12 @@ export function buildWorkoutSteps(sectionIds, currentWeek, baseLevels = {}) {
   const steps = [];
 
   const filteredExercises = EXERCISES.filter(e => {
-    return sectionIds.includes(e.sectionId);
+    const lvl = baseLevels[e.sectionId] ?? baseLevels['core'] ?? 1;
+    return sectionIds.includes(e.sectionId) && lvl > 0;
   });
 
   for (const exercise of filteredExercises) {
-    // Use the specific baseLevel for this exercise's section, default to 1 (or core if not found)
-    const sectionLevel = baseLevels[exercise.sectionId] || baseLevels['core'] || 1;
+    const sectionLevel = baseLevels[exercise.sectionId] ?? baseLevels['core'] ?? 1;
     const progressed = applyProgression(exercise, currentWeek, sectionLevel);
 
     if (progressed.perSide) {
