@@ -1,6 +1,6 @@
 # AFGEROND — Pilates Routine
 
-## 2026-07-23 (v1.2.5 Bugfixes)
+## 2026-07-23 (v1.2.6 Bugfixes)
 
 - **Onboarding Hersteld**: Fix voor `TypeError: Cannot read properties of undefined (reading 'core')` in stap 1 door `baseLevels` toe te voegen aan de fallback state in `src/state.js`.
 - **Leaderboard Crash & Verbinding Hersteld**: Firestore regels gecorrigeerd; `.keys().hasOnly(...)` verving naar `.affectedKeys().hasOnly(...)` om te voorkomen dat bestaande velden (zoals legacy `gender`) cloud-updates (zoals `pushUserProgress`) blokkeerden met een `PERMISSION DENIED` crash. De `score <= resource.data.score + 1` beperking is ook verwijderd omdat dit offline bulk-uploads weigerde.
