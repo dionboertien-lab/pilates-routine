@@ -1,7 +1,7 @@
 export const state = {
   screen: 'home', 
   onboardingStep: 0,
-  onboardingData: { name: '', gender: 'female', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: '' },
+  onboardingData: { name: '', gender: 'female', goals: [], dailyMinutes: 15, daysPerWeek: 6, startDate: '', baseLevels: { core: 0, 'benen-billen': 0, 'rug-houding': 0 } },
   workoutSteps: [],
   currentStepIndex: 0,
   showingSectionIntro: false,

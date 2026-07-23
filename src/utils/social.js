@@ -59,13 +59,20 @@ export async function pushUserProgress(data) {
     const userSnap = await getDoc(userRef);
     const communities = userSnap.exists() ? (userSnap.data().communities || ['global']) : ['global'];
 
+    const serverTotal = userSnap.exists() ? (userSnap.data().totalWorkouts || 0) : 0;
+    const finalTotal = Math.max(data.totalWorkouts || 0, serverTotal);
+    const serverWeek = userSnap.exists() ? (userSnap.data().currentWeek || 1) : 1;
+    const finalWeek = Math.max(data.currentWeek || 1, serverWeek);
+    const serverMissed = userSnap.exists() ? (userSnap.data().missedWorkouts || 0) : 0;
+    const finalMissed = Math.max(data.missedWorkouts || 0, serverMissed);
+
     const batch = writeBatch(db);
 
     batch.set(userRef, {
       name: displayName,
-      totalWorkouts: data.totalWorkouts || 0,
-      currentWeek: data.currentWeek || 1,
-      missedWorkouts: data.missedWorkouts || 0,
+      totalWorkouts: finalTotal,
+      currentWeek: finalWeek,
+      missedWorkouts: finalMissed,
       lastActive: serverTimestamp()
     }, { merge: true });
 
@@ -73,8 +80,8 @@ export async function pushUserProgress(data) {
       const memberRef = doc(db, 'communities', commCode, 'members', user.uid);
       batch.set(memberRef, {
         displayName: displayName,
-        score: data.totalWorkouts || 0,
-        currentWeek: data.currentWeek || 1,
+        score: finalTotal,
+        currentWeek: finalWeek,
         lastActive: serverTimestamp()
       }, { merge: true });
     }

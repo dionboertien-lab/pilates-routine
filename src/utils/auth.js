@@ -48,9 +48,9 @@ export async function loginWithGoogle() {
       const result = await signInWithCredential(auth, credential);
       return { user: result.user, error: null };
     } else {
-      // On web, use popup
-      const result = await signInWithPopup(auth, googleProvider);
-      return { user: result.user, error: null };
+      // On web, use redirect which is much more reliable on mobile browsers than popup
+      await signInWithRedirect(auth, googleProvider);
+      return { user: null, error: null }; // Will be handled by onAuthStateChanged after redirect
     }
   } catch (error) {
     return { user: null, error: error.message };

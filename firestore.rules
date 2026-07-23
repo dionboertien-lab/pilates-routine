@@ -12,7 +12,14 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId && validUserData();
+      allow create: if request.auth != null && request.auth.uid == userId && validUserData();
+      allow update: if request.auth != null && request.auth.uid == userId 
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'totalWorkouts', 'currentWeek', 'missedWorkouts', 'communities', 'lastActive'])
+                    && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 50))
+                    && (!('totalWorkouts' in request.resource.data) || (request.resource.data.totalWorkouts is int && request.resource.data.totalWorkouts >= 0))
+                    && (!('missedWorkouts' in request.resource.data) || (request.resource.data.missedWorkouts is int && request.resource.data.missedWorkouts >= 0))
+                    && (!('currentWeek' in request.resource.data) || (request.resource.data.currentWeek is int && request.resource.data.currentWeek >= 1 && request.resource.data.currentWeek <= 8))
+                    && (!('communities' in request.resource.data) || (request.resource.data.communities is list && request.resource.data.communities.size() <= 20));
                     
       match /chats/{chatId} {
         allow read: if request.auth != null && request.auth.uid == userId;
@@ -56,15 +63,10 @@ service cloud.firestore {
                       && request.resource.data.displayName.size() <= 50;
         allow update: if request.auth != null 
                       && request.auth.uid == memberUid
-                      && request.resource.data.keys().hasOnly(['displayName', 'score', 'currentWeek', 'lastActive'])
-                      && request.resource.data.score is int
-                      && request.resource.data.score >= resource.data.score
-                      && request.resource.data.score <= resource.data.score + 1
-                      && request.resource.data.currentWeek is int
-                      && request.resource.data.currentWeek >= 1
-                      && request.resource.data.currentWeek <= 8
-                      && request.resource.data.displayName is string
-                      && request.resource.data.displayName.size() <= 50;
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'score', 'currentWeek', 'lastActive'])
+                      && (!('score' in request.resource.data) || (request.resource.data.score is int && request.resource.data.score >= resource.data.score))
+                      && (!('currentWeek' in request.resource.data) || (request.resource.data.currentWeek is int && request.resource.data.currentWeek >= 1 && request.resource.data.currentWeek <= 8))
+                      && (!('displayName' in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 50));
         allow delete: if request.auth != null && request.auth.uid == memberUid;
       }
     }

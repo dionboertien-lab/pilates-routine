@@ -1,5 +1,12 @@
 # AFGEROND — Pilates Routine
 
+## 2026-07-23 (v1.2.5 Bugfixes)
+
+- **Onboarding Hersteld**: Fix voor `TypeError: Cannot read properties of undefined (reading 'core')` in stap 1 door `baseLevels` toe te voegen aan de fallback state in `src/state.js`.
+- **Leaderboard Crash & Verbinding Hersteld**: Firestore regels gecorrigeerd; `.keys().hasOnly(...)` verving naar `.affectedKeys().hasOnly(...)` om te voorkomen dat bestaande velden (zoals legacy `gender`) cloud-updates (zoals `pushUserProgress`) blokkeerden met een `PERMISSION DENIED` crash. De `score <= resource.data.score + 1` beperking is ook verwijderd omdat dit offline bulk-uploads weigerde.
+- **Sync Oude vs Nieuwe Data**: `pushUserProgress()` gebruikt nu net als login `Math.max()` tussen server-data en lokale data, waardoor cloud-scores veilig blijven na een app reset.
+- **Web Login Hang**: `signInWithPopup` vervangen door `signInWithRedirect` voor het web/Capacitor-fallback inlogproces om het langdurig "witte scherm" issue op mobiele browsers (cross-site isolatie) te verhelpen.
+
 ## 2026-07-23 (5e Audit-ronde v1.2.4)
 
 - **Coach Screen Scope Fix**: Event-listeners, `chatRef` en `sendMessage` logica hersteld binnen de correcte scope van `renderCoach()`.
