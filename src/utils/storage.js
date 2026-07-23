@@ -67,9 +67,9 @@ export function normalizeProfile(input = {}) {
     language: ['nl', 'en'].includes(input.language) ? input.language : 'nl',
     startDate: parseLocalISODate(input.startDate) ? input.startDate : formatDate(new Date()),
     baseLevels: {
-      'core': clampInteger(input.baseLevels?.['core'], 0, 8, 1),
-      'benen-billen': clampInteger(input.baseLevels?.['benen-billen'], 0, 8, 1),
-      'rug-houding': clampInteger(input.baseLevels?.['rug-houding'], 0, 8, 1),
+      'core': clampInteger(input.baseLevels?.['core'], 0, 8, 0),
+      'benen-billen': clampInteger(input.baseLevels?.['benen-billen'], 0, 8, 0),
+      'rug-houding': clampInteger(input.baseLevels?.['rug-houding'], 0, 8, 0),
     },
     includeStretch: input.includeStretch !== false,
     onboardingComplete: input.onboardingComplete === true,

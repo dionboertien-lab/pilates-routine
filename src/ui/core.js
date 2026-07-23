@@ -9,30 +9,6 @@ import { renderCoach } from './screens/coachScreen.js';
 
 export const app = document.getElementById('app');
 
-// ULTIMATE DEBUG PROTOCOL: Global error catcher overlay
-function showDebugError(msg) {
-  const div = document.createElement('div');
-  div.style.position = 'fixed';
-  div.style.top = '10px';
-  div.style.left = '10px';
-  div.style.right = '10px';
-  div.style.background = 'red';
-  div.style.color = 'white';
-  div.style.padding = '10px';
-  div.style.zIndex = '999999';
-  div.style.fontSize = '12px';
-  div.style.wordBreak = 'break-all';
-  div.style.borderRadius = '8px';
-  div.innerHTML = `<strong>CRASH:</strong> ${msg}<br><br><button onclick="this.parentElement.remove()" style="padding:5px;background:#fff;color:#f00;border:none;border-radius:4px;">Dismiss</button>`;
-  document.body.appendChild(div);
-}
-window.addEventListener('error', (e) => {
-  showDebugError(e.message + ' in ' + e.filename + ':' + e.lineno);
-});
-window.addEventListener('unhandledrejection', (e) => {
-  showDebugError(e.reason ? (e.reason.message || e.reason) : 'Unhandled Promise Rejection');
-});
-
 const screenCleanups = new Map();
 let activeScreen = null;
 

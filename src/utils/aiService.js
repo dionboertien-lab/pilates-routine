@@ -1,7 +1,12 @@
 import { CreateMLCEngine } from '@mlc-ai/web-llm';
 
+// ⚠️ SECURITY WARNING: VITE_GEMINI_API_KEY is embedded in the client-side bundle.
+// Anyone can extract it from the APK or browser DevTools.
+// TODO: Either (1) set up a server-side proxy via VITE_AI_PROXY_URL and remove the key,
+//       or (2) restrict this key in Google Cloud Console to your domain + Android package name.
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL; // Optional backend proxy endpoint
+const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL; // Preferred: route through a backend proxy
+
 
 export const AVAILABLE_LOCAL_MODELS = [
   {
